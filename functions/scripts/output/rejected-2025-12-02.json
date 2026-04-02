@@ -1,0 +1,63 @@
+[
+  {
+    "playlistId": "PLKU9c-CFSWUVYrVJXDyGLRrC4YNjhz1f2",
+    "title": "Kids TV Shows In Reversed!",
+    "description": "",
+    "channelTitle": "Duck The Great Western Engine",
+    "channelId": "UC02X2CDNj6RX2PnQp3LZ3HQ",
+    "thumbnail": "https://img.youtube.com/vi/TGXNp6aXPrs/mqdefault.jpg",
+    "query": "kid shows",
+    "videoCount": 26,
+    "source": "scraping",
+    "videoTitles": [
+      "teletubbies backwards with lyrics",
+      "Barney Song Backwards",
+      "CREEPY SESAME STREET THEME REVERSED",
+      "BACKYARDIGANS THEME BACKWARDS! (HILARIOUS!!)",
+      "Dora Theme Song Backward (SUBLIMINAL) NOT FOR CHILDREN!!! CURSED!!!",
+      "SpongeBob Squarepants Theme Song Backwards (Lyrics)",
+      "Blue's Clues Theme Song Reversed With Lyrics (Thank you for 1000 subscribers!)",
+      "Arthur theme song backwards with lyrics",
+      "Thomas Song Reversed with lyrics",
+      "Johnny Test S1 Theme Song Reversed",
+      "Caillou Theme Song Backwards Lyrics With Subtitles",
+      "Spiderman Cartoon Theme Song - BACKWARDS with LYRICS",
+      "The VeggieTales Theme Song (1994 Version) [Backwards With Lyrics!]",
+      "MICKEY MOUSE CLUBHOUSE SONG REVERSED WITH LYRICS",
+      "Phineas and Ferb theme song backwards with lyrics HD"
+    ],
+    "analysis": {
+      "isAppropriate": false,
+      "confidenceScore": 7,
+      "ageMin": 0,
+      "ageMax": 12,
+      "category": "Entertainment",
+      "tags": [
+        "backward songs",
+        "theme songs",
+        "creepy themes",
+        "subliminal messages",
+        "humor"
+      ],
+      "language": "English",
+      "briefDescription": "A collection of children's theme songs played in reverse, often with humorous or creepy undertones.",
+      "reasoning": "While the content features familiar children's songs, the reverse playback and references to subliminal messages may not be suitable for all young audiences."
+    },
+    "ranking": {
+      "score": 7.4,
+      "boost": 0,
+      "factors": {
+        "aiScore": 7,
+        "channelAuthority": 8.5,
+        "engagement": 6.8,
+        "freshness": 7
+      }
+    },
+    "channelStats": {
+      "subscriberCount": 0,
+      "isVerified": false,
+      "authorityScore": 8.5
+    },
+    "discoveredAt": "2025-12-02T20:57:52.448Z"
+  }
+]

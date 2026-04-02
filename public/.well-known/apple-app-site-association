@@ -1,0 +1,13 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "DRTRQUNHXC.com.vidopick.app",
+        "paths": [
+          "*"
+        ]
+      }
+    ]
+  }
+}

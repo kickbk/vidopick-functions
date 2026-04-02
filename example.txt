@@ -1,0 +1,7 @@
+yarn createInvite -n "Jodie" --slug "j-eng" \
+  --param ref=jodie \
+  --param campaign=social_launch \
+  --playlists '[{"id":"PLYAIvON2-1IYVwtOhVYZW_yNbJQzDIJ-V","title":"🤗 Welcome"},
+    {"title":"Peppa", "id": "PLFEgnf4tmQe8kGKYQCa_iuLKBPHf9P59U"},
+    {"title":"Masha", "id": "PL-yqdhzdKqQRQtEyciC3zfKPZPSzCcQWf"},
+    {"title":"Bluey", "id": "PLbtUQWldWkKiW9UTRmRWTItCPaGOPh6lZ"}]'

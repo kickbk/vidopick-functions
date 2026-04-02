@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.vidopick.app",
+      "sha256_cert_fingerprints": [
+        "BA:D2:25:61:4A:C6:F4:1F:F6:F0:3E:20:EF:87:B5:28:4B:71:81:AB:7F:01:BE:6B:18:A0:E4:FC:E6:FB:23:19",
+        "FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C"
+      ]
+    }
+  }
+]

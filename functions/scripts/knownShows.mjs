@@ -1,0 +1,42 @@
+/**
+ * Shared list of popular kids shows for tag detection
+ * Used by discovery and invite scripts
+ */
+
+export const knownShows = [
+  'Peppa Pig',
+  'Bluey',
+  'CoComelon',
+  'Blippi',
+  'Ms Rachel',
+  'Miss Rachel',
+  'Sesame Street',
+  'Paw Patrol',
+  'Daniel Tiger',
+  'PJ Masks',
+  'Elmo',
+  'Baby Shark',
+  'Little Baby Bum',
+  'Super Simple Songs',
+  'Mickey Mouse',
+  'Minnie Mouse',
+  'Doc McStuffins',
+  'Sofia the First',
+  'Octonauts',
+  'Hey Duggee',
+  'Sarah & Duck',
+  'Numberblocks',
+  'Alphablocks',
+  'Masha and the Bear',
+  'Pinkfong',
+  'Dave and Ava',
+  'Morphle',
+  "Gracie's Corner",
+  "Ryan's World",
+  'Mother Goose Club',
+  "Everything's Rosie",
+  "Mia's Magic Playground",
+  'The EggVenturers',
+  'Peter Rabbit',
+  'Tayo the Little Bus',
+];
