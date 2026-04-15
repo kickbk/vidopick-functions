@@ -3,6 +3,8 @@ import { onRequest } from 'firebase-functions/v2/https';
 
 const db = getFirestore();
 
+const DEMO_ADVERTISER_ID = process.env.DEMO_ADVERTISER_ID ?? '';
+
 // === CONFIGURATION ===
 const TOTAL_AFFILIATE_PERCENT = 10; // 10% dedicated to user's invites (guaranteed slots)
 const GLOBAL_AFFILIATE_FILL_RATE = 0.03; // 3% probability per available global slot
@@ -51,8 +53,9 @@ export const getNextAdBatch = onRequest(
         return;
       }
 
-      // 1. Fetch Advertisers (Standard)
+      // 1. Fetch Advertisers (Standard) — exclude the demo advertiser from the global pool
       const snapshot = await db.collection('advertisers').where('isActive', '==', true).get();
+      const demoId = DEMO_ADVERTISER_ID;
       if (snapshot.empty) {
         response.status(200).json({ ads: Array(batchSize).fill(null) });
         return;
@@ -65,6 +68,8 @@ export const getNextAdBatch = onRequest(
       const results = await Promise.allSettled(
         snapshot.docs.map(async (doc) => {
           const advertiserId = doc.id;
+          // Demo advertiser ads are only shown to users who scanned their invite (via affiliateIds)
+          if (demoId && advertiserId === demoId) return [];
           const adsSnapshot = await db
             .collection('advertisers')
             .doc(advertiserId)
@@ -78,6 +83,7 @@ export const getNextAdBatch = onRequest(
             if (ad.isPaused === true) continue;
             if (ad.activeFrom && now < ad.activeFrom) continue;
             if (ad.activeUntil && now > ad.activeUntil) continue;
+            if (platform === 'tv' && !ad.imageUrlLandscape) continue;
             validAds.push({ advertiserId, adId: adDoc.id });
           }
           return validAds;

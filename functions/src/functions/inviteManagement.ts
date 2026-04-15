@@ -370,3 +370,4 @@ export const listInvites = onCall(async (request) => {
     throw new HttpsError('internal', `Failed to list invites: ${error.message}`);
   }
 });
+

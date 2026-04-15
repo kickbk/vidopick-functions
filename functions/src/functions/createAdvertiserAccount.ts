@@ -1,29 +1,38 @@
-// Cloud Function to create advertiser account without logging in as them
-
 import * as admin from 'firebase-admin';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { Resend } from 'resend';
+import { buildInviteEmail } from '../utils/emailTemplates';
 
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+
+const ALLOWED_ORIGINS = ['https://vidopick.com', 'http://localhost:5173'];
+
+function resolveAppUrl(appOrigin?: string): string {
+  if (appOrigin && ALLOWED_ORIGINS.includes(appOrigin)) return appOrigin;
+  return 'https://vidopick.com';
+}
+
 /**
- * Create an advertiser account server-side
- * This prevents logging out the admin who's creating the account
+ * Create an advertiser account server-side, then automatically send an invite email
+ * with a magic sign-in link. No passwords involved — advertiser clicks the link to access
+ * their account, and requests new links from the login page for future sign-ins.
  */
 export const createAdvertiserAccount = onCall(async (request) => {
-  // Verify caller is admin
   if (!request.auth || request.auth.token.role !== 'admin') {
     throw new HttpsError('permission-denied', 'Only admins can create advertiser accounts');
   }
 
-  const { email, advertiserId } = request.data;
+  const { email, advertiserId, appOrigin } = request.data;
+  const APP_URL = resolveAppUrl(appOrigin);
 
   if (!email || !advertiserId) {
     throw new HttpsError('invalid-argument', 'Email and advertiserId are required');
   }
 
-  // Basic email format validation
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     throw new HttpsError('invalid-argument', 'Invalid email format');
@@ -31,22 +40,21 @@ export const createAdvertiserAccount = onCall(async (request) => {
 
   const db = admin.firestore();
 
+  // Check advertiser exists BEFORE creating the Auth user (prevents orphan accounts)
+  const advertiserRef = db.doc(`advertisers/${advertiserId}`);
+  const advertiserSnap = await advertiserRef.get();
+
+  if (!advertiserSnap.exists) {
+    throw new HttpsError('not-found', `Advertiser ID '${advertiserId}' does not exist.`);
+  }
+
+  const advertiserName: string = advertiserSnap.data()!.name || 'there';
+
   try {
-    // SECURITY FIX: Check if advertiser document exists BEFORE creating user
-    // This prevents creating "orphan" users if there is a typo in advertiserId
-    const advertiserRef = db.doc(`advertisers/${advertiserId}`);
-    const advertiserSnap = await advertiserRef.get();
-
-    if (!advertiserSnap.exists) {
-      throw new HttpsError('not-found', `Advertiser ID '${advertiserId}' does not exist.`);
-    }
-
-    // Generate temporary password
+    // Create Firebase Auth account with a random temp password the advertiser never uses
     const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
-
-    // Create Firebase Auth account (server-side, doesn't affect current session)
     const userRecord = await admin.auth().createUser({
-      email: email,
+      email,
       password: tempPassword,
       emailVerified: false,
     });
@@ -56,7 +64,7 @@ export const createAdvertiserAccount = onCall(async (request) => {
     // Set custom claims immediately
     await admin.auth().setCustomUserClaims(userRecord.uid, {
       role: 'advertiser',
-      advertiserId: advertiserId,
+      advertiserId,
     });
 
     console.log(`Set advertiser claims for ${userRecord.uid}`);
@@ -71,16 +79,30 @@ export const createAdvertiserAccount = onCall(async (request) => {
 
     console.log(`Updated Firestore for advertiser ${advertiserId}`);
 
-    // Generate password reset link
-    const resetLink = await admin.auth().generatePasswordResetLink(email);
+    // Generate magic sign-in link and send invite email
+    const continueUrl = `${APP_URL}/admin/auth/email-action/?email=${encodeURIComponent(email)}`;
+    const signInLink = await admin.auth().generateSignInWithEmailLink(email, {
+      url: continueUrl,
+      handleCodeInApp: true,
+    });
 
-    console.log(`Generated password reset link for ${email}`);
+    if (RESEND_API_KEY) {
+      const resend = new Resend(RESEND_API_KEY);
+      await resend.emails.send({
+        from: 'Vidopick <hello@vidopick.com>',
+        to: email,
+        subject: "You're invited to Vidopick",
+        html: buildInviteEmail(advertiserName, signInLink),
+      });
+      console.log(`Sent invite email to ${email}`);
+    } else {
+      console.warn('RESEND_API_KEY not configured — invite email not sent');
+    }
 
     return {
       success: true,
-      message: `Account created for ${email}. Password reset link generated.`,
+      message: `Account created and invite email sent to ${email}`,
       uid: userRecord.uid,
-      passwordResetLink: resetLink,
     };
   } catch (error: any) {
     console.error('Error creating advertiser account:', error);
@@ -89,7 +111,6 @@ export const createAdvertiserAccount = onCall(async (request) => {
       throw new HttpsError('already-exists', 'An account with this email already exists');
     }
 
-    // Pass through HttpsErrors directly
     if (error instanceof HttpsError) {
       throw error;
     }
