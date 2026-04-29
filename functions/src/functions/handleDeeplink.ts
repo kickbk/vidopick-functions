@@ -1,6 +1,7 @@
 // Short-link redirector: https://vpk.to/:id
 import express from 'express';
 import * as admin from 'firebase-admin';
+import QRCode from 'qrcode';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { onRequest } from 'firebase-functions/v2/https';
@@ -174,6 +175,125 @@ function rollupClick(id: string, platform: 'ios' | 'android' | 'desktop') {
     )
     .catch((e) => console.warn('click analytics update failed', e));
 }
+
+// --- Auth redirect (Firebase magic-link continueUrl) ---
+// Firebase redirects to /auth-redirect after processing the oobCode in the browser.
+// On mobile the app intercepts vpk.to via universal links before reaching here.
+// On desktop we show a QR code page so the user can scan with their phone instead.
+app.get('/auth-redirect', async (req, res) => {
+  const ua = String(req.headers['user-agent'] || '');
+
+  // For the QR code / deep link URL always use vpk.to so that universal links
+  // intercept on the phone and open the app directly. Fall back to the actual
+  // host only on localhost (emulator testing).
+  const actualHost = req.get('host') || '';
+  const isLocal = actualHost.includes('localhost') || actualHost.includes('127.0.0.1');
+  const canonicalHost = isLocal ? `${req.protocol}://${actualHost}` : 'https://vpk.to';
+  const qs = new URLSearchParams(req.query as Record<string, string>).toString();
+  const fullUrl = `${canonicalHost}/auth-redirect${qs ? `?${qs}` : ''}`;
+
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+
+  const sharedStyles = `
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;position:relative;overflow:hidden;}
+    .blob{position:absolute;border-radius:50%;filter:blur(80px);pointer-events:none;}
+    .blob-1{width:420px;height:420px;background:rgba(59,130,246,0.15);top:-120px;right:-120px;}
+    .blob-2{width:320px;height:320px;background:rgba(139,92,246,0.1);bottom:-60px;left:-60px;}
+    .card{position:relative;z-index:1;max-width:440px;width:100%;text-align:center;}
+    .hero{width:160px;height:160px;object-fit:contain;margin:0 auto 20px;display:block;filter:drop-shadow(0 16px 32px rgba(59,130,246,0.35));animation:float 4s ease-in-out infinite;}
+    @keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
+    h1{font-size:26px;font-weight:700;color:#fff;margin-bottom:10px;}
+    .sub{font-size:15px;color:#94a3b8;line-height:1.6;margin-bottom:24px;}
+    .badge{display:block;text-align:center;color:#93c5fd;font-size:11px;font-weight:700;padding:4px 0;margin-bottom:16px;letter-spacing:0.08em;text-transform:uppercase;}`;
+
+  // Mobile: universal links normally intercept before reaching here.
+  // This fallback page handles the case where the app is not installed.
+  if (isIOS(ua) || isAndroid(ua)) {
+    const store = isIOS(ua)
+      ? 'https://apps.apple.com/us/app/vidopick/id6749210639'
+      : 'https://play.google.com/store/apps/details?id=com.vidopick.app';
+
+    return res.status(200).send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Sign in to Vidopick</title>
+  <style>
+    ${sharedStyles}
+    .btn-primary{display:block;background:#3b82f6;color:#fff;text-decoration:none;padding:15px 24px;border-radius:14px;font-size:16px;font-weight:700;margin-bottom:12px;transition:opacity .15s;}
+    .btn-primary:active{opacity:.8;}
+    .btn-store{display:block;color:#64748b;font-size:13px;text-decoration:none;padding:10px;}
+    .btn-store:hover{color:#94a3b8;}
+  </style>
+</head>
+<body>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="card">
+    <img class="hero" src="https://vidopick.com/images/invite.png" alt="Vidopick"/>
+    <div class="badge">Sign in</div>
+    <h1>Open in Vidopick</h1>
+    <p class="sub">Tap below to open the app and complete your sign-in. If the app is not installed, get it first then come back.</p>
+    <a class="btn-primary" href="${escapeHtml(fullUrl)}">Open Vidopick</a>
+    <a class="btn-store" href="${escapeHtml(store)}">Get Vidopick from the store</a>
+  </div>
+</body>
+</html>`);
+  }
+
+  // Desktop: generate QR code SVG server-side (no client-side JS needed)
+  let qrSvg: string;
+  try {
+    qrSvg = await QRCode.toString(fullUrl, { type: 'svg', width: 220, margin: 2 });
+  } catch (e) {
+    console.error('[auth-redirect] QR generation failed:', e);
+    return res.status(200).send(`<!doctype html><html><body style="background:#0f172a;color:#e2e8f0;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:24px;">
+      <div><h1 style="color:#fff;margin-bottom:12px;">Open this link on your phone</h1>
+      <p style="color:#94a3b8;">Copy the link from your email and open it on your phone to sign in to Vidopick.</p></div>
+    </body></html>`);
+  }
+
+  return res.status(200).send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Sign in to Vidopick</title>
+  <style>
+    ${sharedStyles}
+    .qr-outer{background:#1e293b;border:1px solid #334155;border-radius:24px;padding:28px 28px 20px;display:inline-block;margin-bottom:16px;}
+    .qr-inner{background:#fff;padding:12px;border-radius:14px;display:inline-block;line-height:0;}
+    .qr-inner svg{display:block;width:220px;height:220px;}
+    .note{font-size:13px;color:#475569;}
+  </style>
+</head>
+<body>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="card">
+    <img class="hero" src="https://vidopick.com/images/invite.png" alt="Vidopick"/>
+    <div class="badge">Sign in</div>
+    <h1>Open on your phone</h1>
+    <p class="sub">Scan this code with your phone's camera to complete sign-in to Vidopick.</p>
+    <div class="qr-outer">
+      <div class="qr-inner">${qrSvg}</div>
+    </div>
+    <p class="note">Single-use link. Valid for 30 minutes.</p>
+  </div>
+</body>
+</html>`);
+});
+
+// --- Device auth handoff ---
+// Scanned from the device QR code: vpk.to/device-auth?session=...
+// Proxy to vidopick.com/device-auth/ preserving all query params.
+app.get('/device-auth', (req, res) => {
+  const qs = new URLSearchParams(req.query as Record<string, string>).toString();
+  return res.redirect(302, `${VIDOPICK_ORIGIN}/device-auth/${qs ? `?${qs}` : ''}`);
+});
 
 // --- Route ---
 app.get('/:id', async (req, res) => {

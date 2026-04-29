@@ -5,27 +5,27 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-export const deleteAdvertiser = onCall(async (request) => {
+export const deleteOrganization = onCall(async (request) => {
   if (!request.auth || request.auth.token.role !== 'admin') {
-    throw new HttpsError('permission-denied', 'Only admins can delete advertisers');
+    throw new HttpsError('permission-denied', 'Only admins can delete organizations');
   }
 
-  const { advertiserId } = request.data;
+  const { organizationId } = request.data;
 
-  if (!advertiserId) {
-    throw new HttpsError('invalid-argument', 'advertiserId is required');
+  if (!organizationId) {
+    throw new HttpsError('invalid-argument', 'organizationId is required');
   }
 
   const db = admin.firestore();
-  const advertiserRef = db.doc(`advertisers/${advertiserId}`);
-  const advertiserSnap = await advertiserRef.get();
+  const organizationRef = db.doc(`organizations/${organizationId}`);
+  const organizationSnap = await organizationRef.get();
 
-  if (!advertiserSnap.exists) {
-    throw new HttpsError('not-found', 'Advertiser not found');
+  if (!organizationSnap.exists) {
+    throw new HttpsError('not-found', 'Organization not found');
   }
 
-  const data = advertiserSnap.data()!;
-  const advertiserName = data.name || advertiserId;
+  const data = organizationSnap.data()!;
+  const organizationName = data.name || organizationId;
 
   // Delete Firebase Auth user if one exists
   if (data.authUid) {
@@ -41,11 +41,11 @@ export const deleteAdvertiser = onCall(async (request) => {
   }
 
   // Recursively delete the Firestore document and all sub-collections (ads, etc.)
-  await db.recursiveDelete(advertiserRef);
-  console.log(`Deleted advertiser ${advertiserId} (${advertiserName}) from Firestore`);
+  await db.recursiveDelete(organizationRef);
+  console.log(`Deleted organization ${organizationId} (${organizationName}) from Firestore`);
 
   return {
     success: true,
-    message: `Advertiser "${advertiserName}" has been permanently deleted`,
+    message: `Organization "${organizationName}" has been permanently deleted`,
   };
 });

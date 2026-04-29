@@ -6,7 +6,7 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-const DEMO_ADVERTISER_ID = process.env.DEMO_ADVERTISER_ID;
+const DEMO_ORGANIZATION_ID = process.env.DEMO_ORGANIZATION_ID;
 const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
 /**
@@ -14,13 +14,13 @@ const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
  * where the user closed the tab without explicitly signing out.
  */
 export const scheduledDemoSessionCheck = onSchedule('every 5 minutes', async () => {
-  if (!DEMO_ADVERTISER_ID) {
-    console.log('scheduledDemoSessionCheck: DEMO_ADVERTISER_ID not configured, skipping');
+  if (!DEMO_ORGANIZATION_ID) {
+    console.log('scheduledDemoSessionCheck: DEMO_ORGANIZATION_ID not configured, skipping');
     return;
   }
 
   const db = admin.firestore();
-  const snap = await db.doc(`advertisers/${DEMO_ADVERTISER_ID}`).get();
+  const snap = await db.doc(`organizations/${DEMO_ORGANIZATION_ID}`).get();
 
   if (!snap.exists) return;
 
@@ -47,7 +47,7 @@ export const scheduledDemoSessionCheck = onSchedule('every 5 minutes', async () 
 
     // Revoke tokens for the demo Firebase Auth user so the session is invalidated server-side
     try {
-      const demoSnap = await db.doc(`advertisers/${DEMO_ADVERTISER_ID}`).get();
+      const demoSnap = await db.doc(`organizations/${DEMO_ORGANIZATION_ID}`).get();
       const authUid: string | undefined = demoSnap.data()?.authUid;
       if (authUid) {
         await admin.auth().revokeRefreshTokens(authUid);

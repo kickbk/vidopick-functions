@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 
-const DEMO_ADVERTISER_ID = process.env.DEMO_ADVERTISER_ID;
+const DEMO_ORGANIZATION_ID = process.env.DEMO_ORGANIZATION_ID;
 const DEMO_AD_ID = process.env.DEMO_AD_ID;
 const DEMO_INVITE_ID = process.env.DEMO_INVITE_ID;
 
@@ -12,8 +12,8 @@ const DEMO_INVITE_ID = process.env.DEMO_INVITE_ID;
  * 3. Clears the Firestore session lock fields.
  */
 export async function resetDemoSession(): Promise<void> {
-  if (!DEMO_ADVERTISER_ID) {
-    console.warn('demoReset: DEMO_ADVERTISER_ID not configured, skipping');
+  if (!DEMO_ORGANIZATION_ID) {
+    console.warn('demoReset: DEMO_ORGANIZATION_ID not configured, skipping');
     return;
   }
 
@@ -22,8 +22,8 @@ export async function resetDemoSession(): Promise<void> {
   // ── 1. Delete non-seed ads created during the session ──────────────────────
   if (DEMO_AD_ID) {
     const adsSnap = await db
-      .collection('advertisers')
-      .doc(DEMO_ADVERTISER_ID)
+      .collection('organizations')
+      .doc(DEMO_ORGANIZATION_ID)
       .collection('ads')
       .get();
 
@@ -36,7 +36,7 @@ export async function resetDemoSession(): Promise<void> {
   if (DEMO_INVITE_ID) {
     const invitesSnap = await db
       .collection('shortLinks')
-      .where('params.advertiserId', '==', DEMO_ADVERTISER_ID)
+      .where('params.organizationId', '==', DEMO_ORGANIZATION_ID)
       .get();
 
     const toDelete = invitesSnap.docs.filter((d) => d.id !== DEMO_INVITE_ID);
@@ -48,8 +48,8 @@ export async function resetDemoSession(): Promise<void> {
   const batch = db.batch();
 
   // Clear session lock
-  const advertiserRef = db.doc(`advertisers/${DEMO_ADVERTISER_ID}`);
-  batch.update(advertiserRef, {
+  const organizationRef = db.doc(`organizations/${DEMO_ORGANIZATION_ID}`);
+  batch.update(organizationRef, {
     demoSessionActive: false,
     demoSessionLockedAt: admin.firestore.FieldValue.delete(),
     lastDemoActivity: admin.firestore.FieldValue.delete(),
@@ -58,7 +58,7 @@ export async function resetDemoSession(): Promise<void> {
 
   // Reset seed ad to baseline stats
   if (DEMO_AD_ID) {
-    const adRef = db.doc(`advertisers/${DEMO_ADVERTISER_ID}/ads/${DEMO_AD_ID}`);
+    const adRef = db.doc(`organizations/${DEMO_ORGANIZATION_ID}/ads/${DEMO_AD_ID}`);
     batch.update(adRef, {
       impressions: 3847,
       skips: 2961,
@@ -77,7 +77,7 @@ export async function resetDemoSession(): Promise<void> {
   if (DEMO_INVITE_ID) {
     const inviteRef = db.doc(`shortLinks/${DEMO_INVITE_ID}`);
     batch.update(inviteRef, {
-      'params.advertiserId': DEMO_ADVERTISER_ID,
+      'params.organizationId': DEMO_ORGANIZATION_ID,
       analytics: {
         clicks:      { total: 412, byPlatform: { ios: 218, android: 143, tv: 51 } },
         conversions: { total: 87,  byPlatform: { ios: 46,  android: 31,  tv: 10 } },
@@ -86,5 +86,5 @@ export async function resetDemoSession(): Promise<void> {
   }
 
   await batch.commit();
-  console.log(`demoReset: session released and stats reset for advertiser ${DEMO_ADVERTISER_ID}`);
+  console.log(`demoReset: session released and stats reset for organization ${DEMO_ORGANIZATION_ID}`);
 }

@@ -31,7 +31,7 @@ export const compressUploadedImage = onObjectFinalized(
     let format: 'webp' | 'jpeg' = 'webp';
     let folderType = '';
 
-    if (filePath.startsWith('advertisers/') && filePath.includes('/ads/')) {
+    if (filePath.startsWith('organizations/') && filePath.includes('/ads/')) {
       folderType = 'AD';
       targetWidth = 1920;
       targetHeight = 1080;

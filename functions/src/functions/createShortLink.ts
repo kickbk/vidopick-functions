@@ -32,12 +32,15 @@ type CreateBody = {
   meta?: Record<string, any>;
   ttl?: string | number | Date | null; // optional expiration date/time
   playlists?: Playlist[];
-  advertiserId?: string;
+  organizationId?: string;
 };
 
 const COLLECTION = 'shortLinks';
 const RANDOM_ID_LENGTH = 10;
 const MAX_TRIES = 5;
+
+// Slugs reserved for named routes in handleDeeplink — cannot be used as short-link IDs.
+const RESERVED_SLUGS = new Set(['auth-redirect', 'device-auth']);
 
 const makeDocData = (b: CreateBody) => ({
   linkTitle: b.linkTitle,
@@ -52,13 +55,13 @@ const makeDocData = (b: CreateBody) => ({
   params: {
     ...(b.params ?? {}),
     ...(b.playlists ? { playlists: b.playlists } : {}),
-    // Ensure advertiserId is in params for Firestore queries
-    ...(b.advertiserId ? { advertiserId: b.advertiserId } : {}),
+    // Ensure organizationId is in params for Firestore queries
+    ...(b.organizationId ? { organizationId: b.organizationId } : {}),
   },
   analytics: b.analytics ?? {},
   meta: b.meta ?? {},
-  // Store advertiserId at top level too (for your script's needs)
-  ...(b.advertiserId ? { advertiserId: b.advertiserId } : {}),
+  // Store organizationId at top level too (for query needs)
+  ...(b.organizationId ? { organizationId: b.organizationId } : {}),
 });
 
 app.post('/', async (req, res): Promise<void> => {
@@ -85,13 +88,13 @@ app.post('/', async (req, res): Promise<void> => {
     return;
   }
 
-  // Check if user is admin or advertiser
+  // Check if user is admin or organization
   const isAdmin = decodedToken.role === 'admin';
-  const isAdvertiser = decodedToken.role === 'advertiser';
+  const isOrganization = decodedToken.role === 'organization';
 
-  if (!isAdmin && !isAdvertiser) {
+  if (!isAdmin && !isOrganization) {
     res.status(403).json({
-      error: 'Forbidden - Only admins and advertisers can create short links',
+      error: 'Forbidden - Only admins and organizations can create short links',
     });
     return;
   }
@@ -108,33 +111,33 @@ app.post('/', async (req, res): Promise<void> => {
     return;
   }
 
-  // SECURITY: If advertiser (not admin), force their advertiserId
-  // This prevents advertisers from spoofing other advertisers' IDs
-  if (isAdvertiser && !isAdmin) {
-    const advertiserId = decodedToken.advertiserId;
+  // SECURITY: If organization (not admin), force their organizationId
+  // This prevents organizations from spoofing other organizations' IDs
+  if (isOrganization && !isAdmin) {
+    const organizationId = decodedToken.organizationId;
 
-    if (!advertiserId) {
+    if (!organizationId) {
       res.status(403).json({
-        error: 'Advertiser account not properly configured - missing advertiserId',
+        error: 'Organization account not properly configured - missing organizationId',
       });
       return;
     }
 
-    // Override any advertiserId in the request with the authenticated user's ID
-    body.advertiserId = advertiserId;
+    // Override any organizationId in the request with the authenticated user's ID
+    body.organizationId = organizationId;
 
-    // Ensure params object exists and has correct advertiserId
+    // Ensure params object exists and has correct organizationId
     if (!body.params) {
       body.params = {};
     }
-    body.params.advertiserId = advertiserId;
+    body.params.organizationId = organizationId;
 
-    console.log(`Advertiser ${advertiserId} creating short link: ${body.linkTitle}`);
+    console.log(`Organization ${organizationId} creating short link: ${body.linkTitle}`);
   } else {
-    // Admin can create links with any advertiserId (or none)
+    // Admin can create links with any organizationId (or none)
     console.log(
       `Admin creating short link: ${body.linkTitle}`,
-      body.advertiserId ? `for advertiser ${body.advertiserId}` : '(no advertiser)'
+      body.organizationId ? `for organization ${body.organizationId}` : '(no organization)'
     );
   }
 
@@ -145,6 +148,10 @@ app.post('/', async (req, res): Promise<void> => {
   try {
     // If user supplies a slug, try to create with that exact id.
     if (body.slug) {
+      if (RESERVED_SLUGS.has(body.slug)) {
+        res.status(409).json({ error: 'That slug is reserved and cannot be used.' });
+        return;
+      }
       const id = body.slug;
       const docRef = db.collection(COLLECTION).doc(id);
       try {

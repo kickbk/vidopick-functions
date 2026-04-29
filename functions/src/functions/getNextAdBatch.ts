@@ -1,9 +1,9 @@
-import { getFirestore } from 'firebase-admin/firestore';
-import { onRequest } from 'firebase-functions/v2/https';
+import { getFirestore } from "firebase-admin/firestore";
+import { onRequest } from "firebase-functions/v2/https";
 
 const db = getFirestore();
 
-const DEMO_ADVERTISER_ID = process.env.DEMO_ADVERTISER_ID ?? '';
+const DEMO_ORGANIZATION_ID = process.env.DEMO_ORGANIZATION_ID ?? "";
 
 // === CONFIGURATION ===
 const TOTAL_AFFILIATE_PERCENT = 10; // 10% dedicated to user's invites (guaranteed slots)
@@ -13,35 +13,35 @@ const GLOBAL_AFFILIATE_FILL_RATE = 0.03; // 3% probability per available global 
 interface RequestBody {
   deviceId: string;
   affiliateIds?: string[];
-  platform: 'ios' | 'android' | 'tv';
+  platform: "ios" | "android" | "tv";
   batchSize: number;
 }
 
-interface AdvertiserProfile {
+interface OrganizationProfile {
   id: string;
   isActive: boolean;
-  roles: ('affiliate' | 'paid')[];
+  roles: ("affiliate" | "paid")[];
   paidConfig?: {
     tier: 1 | 2 | 3 | 4 | 5;
-    billingStatus: 'active' | 'paused' | 'cancelled';
+    billingStatus: "active" | "paused" | "cancelled";
   };
 }
 
 interface AdReference {
-  advertiserId: string;
+  organizationId: string;
   adId: string;
 }
 
 export const getNextAdBatch = onRequest(
   {
-    cors: ['*'],
-    region: 'us-central1',
-    memory: '256MiB',
+    cors: ["*"],
+    region: "us-central1",
+    memory: "256MiB",
   },
   async (request, response) => {
     try {
-      if (request.method !== 'POST') {
-        response.status(405).json({ error: 'Method not allowed' });
+      if (request.method !== "POST") {
+        response.status(405).json({ error: "Method not allowed" });
         return;
       }
 
@@ -49,13 +49,16 @@ export const getNextAdBatch = onRequest(
       const { deviceId, affiliateIds = [], platform, batchSize } = body;
 
       if (!deviceId || !platform || !batchSize) {
-        response.status(400).json({ error: 'Missing required fields' });
+        response.status(400).json({ error: "Missing required fields" });
         return;
       }
 
-      // 1. Fetch Advertisers (Standard) — exclude the demo advertiser from the global pool
-      const snapshot = await db.collection('advertisers').where('isActive', '==', true).get();
-      const demoId = DEMO_ADVERTISER_ID;
+      // 1. Fetch Organizations (Standard) — exclude the demo organization from the global pool
+      const snapshot = await db
+        .collection("organizations")
+        .where("isActive", "==", true)
+        .get();
+      const demoId = DEMO_ORGANIZATION_ID;
       if (snapshot.empty) {
         response.status(200).json({ ads: Array(batchSize).fill(null) });
         return;
@@ -67,14 +70,14 @@ export const getNextAdBatch = onRequest(
 
       const results = await Promise.allSettled(
         snapshot.docs.map(async (doc) => {
-          const advertiserId = doc.id;
-          // Demo advertiser ads are only shown to users who scanned their invite (via affiliateIds)
-          if (demoId && advertiserId === demoId) return [];
+          const organizationId = doc.id;
+          // Demo organization ads are only shown to users who scanned their invite (via affiliateIds)
+          if (demoId && organizationId === demoId) return [];
           const adsSnapshot = await db
-            .collection('advertisers')
-            .doc(advertiserId)
-            .collection('ads')
-            .where('isApproved', '==', true)
+            .collection("organizations")
+            .doc(organizationId)
+            .collection("ads")
+            .where("isApproved", "==", true)
             .get();
 
           const validAds: AdReference[] = [];
@@ -83,15 +86,15 @@ export const getNextAdBatch = onRequest(
             if (ad.isPaused === true) continue;
             if (ad.activeFrom && now < ad.activeFrom) continue;
             if (ad.activeUntil && now > ad.activeUntil) continue;
-            if (platform === 'tv' && !ad.imageUrlLandscape) continue;
-            validAds.push({ advertiserId, adId: adDoc.id });
+            if (platform === "tv" && !ad.imageUrlLandscape) continue;
+            validAds.push({ organizationId, adId: adDoc.id });
           }
           return validAds;
-        })
+        }),
       );
 
       results.forEach((result) => {
-        if (result.status === 'fulfilled') eligibleAds.push(...result.value);
+        if (result.status === "fulfilled") eligibleAds.push(...result.value);
       });
 
       if (eligibleAds.length === 0) {
@@ -100,24 +103,28 @@ export const getNextAdBatch = onRequest(
       }
 
       // 3. Map Data
-      const adsByAdvertiser = new Map<string, AdReference[]>();
+      const adsByOrganization = new Map<string, AdReference[]>();
       for (const ad of eligibleAds) {
-        if (!adsByAdvertiser.has(ad.advertiserId)) adsByAdvertiser.set(ad.advertiserId, []);
-        adsByAdvertiser.get(ad.advertiserId)!.push(ad);
+        if (!adsByOrganization.has(ad.organizationId))
+          adsByOrganization.set(ad.organizationId, []);
+        adsByOrganization.get(ad.organizationId)!.push(ad);
       }
 
-      const advertiserProfiles = new Map<string, AdvertiserProfile>();
-      const affiliateAdvertiserIds: string[] = [];
-      const paidAdvertiserIds: string[] = [];
+      const organizationProfiles = new Map<string, OrganizationProfile>();
+      const affiliateOrgIds: string[] = [];
+      const paidOrgIds: string[] = [];
 
       for (const doc of snapshot.docs) {
-        if (adsByAdvertiser.has(doc.id)) {
-          const profile = { id: doc.id, ...doc.data() } as AdvertiserProfile;
-          advertiserProfiles.set(doc.id, profile);
+        if (adsByOrganization.has(doc.id)) {
+          const profile = { id: doc.id, ...doc.data() } as OrganizationProfile;
+          organizationProfiles.set(doc.id, profile);
 
-          if (profile.roles.includes('affiliate')) affiliateAdvertiserIds.push(doc.id);
-          if (profile.roles.includes('paid') && profile.paidConfig?.billingStatus === 'active') {
-            paidAdvertiserIds.push(doc.id);
+          if (profile.roles.includes("affiliate")) affiliateOrgIds.push(doc.id);
+          if (
+            profile.roles.includes("paid") &&
+            profile.paidConfig?.billingStatus === "active"
+          ) {
+            paidOrgIds.push(doc.id);
           }
         }
       }
@@ -127,27 +134,32 @@ export const getNextAdBatch = onRequest(
 
       // Filter to only affiliates that actually exist in our DB and have active ads
       const validUserAffiliates = affiliateIds.filter(
-        (id) => advertiserProfiles.has(id) && adsByAdvertiser.has(id)
+        (id) => organizationProfiles.has(id) && adsByOrganization.has(id),
       );
 
       if (validUserAffiliates.length > 0) {
         // Calculate 10% of batch
-        const totalAffiliateSlots = Math.round((batchSize * TOTAL_AFFILIATE_PERCENT) / 100);
+        const totalAffiliateSlots = Math.round(
+          (batchSize * TOTAL_AFFILIATE_PERCENT) / 100,
+        );
 
         // Split equally
-        const slotsPerAffiliate = Math.floor(totalAffiliateSlots / validUserAffiliates.length);
+        const slotsPerAffiliate = Math.floor(
+          totalAffiliateSlots / validUserAffiliates.length,
+        );
         const remainderSlots = totalAffiliateSlots % validUserAffiliates.length;
 
         console.log(
-          `📊 Dedicating ${totalAffiliateSlots} slots to ${validUserAffiliates.length} affiliates`
+          `📊 Dedicating ${totalAffiliateSlots} slots to ${validUserAffiliates.length} affiliates`,
         );
 
         for (let i = 0; i < validUserAffiliates.length; i++) {
           const affiliateId = validUserAffiliates[i];
-          const affiliateAds = adsByAdvertiser.get(affiliateId)!;
+          const affiliateAds = adsByOrganization.get(affiliateId)!;
 
           // Add remainder to first few affiliates to ensure we use exactly 10%
-          const slotsForThisAffiliate = slotsPerAffiliate + (i < remainderSlots ? 1 : 0);
+          const slotsForThisAffiliate =
+            slotsPerAffiliate + (i < remainderSlots ? 1 : 0);
 
           for (let j = 0; j < slotsForThisAffiliate; j++) {
             // Round Robin through their specific ads
@@ -155,7 +167,9 @@ export const getNextAdBatch = onRequest(
           }
         }
       } else {
-        console.log('ℹ️ No valid user affiliates found - all slots go to global pool');
+        console.log(
+          "ℹ️ No valid user affiliates found - all slots go to global pool",
+        );
       }
 
       // 5. Fill Global Pool (The rest of the batch)
@@ -164,12 +178,12 @@ export const getNextAdBatch = onRequest(
 
       if (globalPoolSlots > 0) {
         const globalAds = buildGlobalPool(
-          adsByAdvertiser,
-          advertiserProfiles,
-          affiliateAdvertiserIds,
-          paidAdvertiserIds,
+          adsByOrganization,
+          organizationProfiles,
+          affiliateOrgIds,
+          paidOrgIds,
           globalPoolSlots,
-          validUserAffiliates // ✅ These will now be EXCLUDED from the global pool
+          validUserAffiliates, // ✅ These will now be EXCLUDED from the global pool
         );
         adBatch.push(...globalAds);
       }
@@ -179,35 +193,35 @@ export const getNextAdBatch = onRequest(
       console.log(
         `✅ Returning ${shuffled.length} slots (${
           adBatch.length - globalPoolSlots
-        } dedicated, ${globalPoolSlots} global)`
+        } dedicated, ${globalPoolSlots} global)`,
       );
 
       response.status(200).json({ ads: shuffled });
     } catch (error) {
-      console.error('Error in getNextAdBatch:', error);
-      response.status(500).json({ error: 'Internal server error' });
+      console.error("Error in getNextAdBatch:", error);
+      response.status(500).json({ error: "Internal server error" });
     }
-  }
+  },
 );
 
 /**
  * Build Global Pool
  */
 function buildGlobalPool(
-  adsByAdvertiser: Map<string, AdReference[]>,
-  advertiserProfiles: Map<string, AdvertiserProfile>,
-  allAffiliateAdvertiserIds: string[],
-  paidAdvertiserIds: string[],
+  adsByOrganization: Map<string, AdReference[]>,
+  organizationProfiles: Map<string, OrganizationProfile>,
+  allAffiliateOrgIds: string[],
+  paidOrgIds: string[],
   totalSlots: number,
-  excludeAffiliateIds: string[]
+  excludeAffiliateIds: string[],
 ): Array<AdReference | null> {
   const pool: Array<AdReference | null> = [];
 
   // --- 1. Affiliate Bonus Logic (Probabilistic & Exclusive) ---
 
   // First, filter the affiliate list to REMOVE any the user already has
-  const eligibleAffiliateIds = allAffiliateAdvertiserIds.filter(
-    (id) => !excludeAffiliateIds.includes(id)
+  const eligibleAffiliateIds = allAffiliateOrgIds.filter(
+    (id) => !excludeAffiliateIds.includes(id),
   );
 
   let allocatedAffiliateCount = 0;
@@ -225,16 +239,17 @@ function buildGlobalPool(
       // Get a flat list of ads from ONLY the eligible (unscanned) affiliates
       const eligibleAdPool: AdReference[] = [];
       eligibleAffiliateIds.forEach((id) => {
-        const ads = adsByAdvertiser.get(id);
+        const ads = adsByOrganization.get(id);
         if (ads) eligibleAdPool.push(...ads);
       });
 
       if (eligibleAdPool.length > 0) {
         // Pick 1 random ad
-        const randomAd = eligibleAdPool[Math.floor(Math.random() * eligibleAdPool.length)];
+        const randomAd =
+          eligibleAdPool[Math.floor(Math.random() * eligibleAdPool.length)];
         pool.push(randomAd);
         console.log(
-          `🎲 Won lottery: Inserting 1 Global Affiliate Ad (ID: ${randomAd.advertiserId})`
+          `🎲 Won lottery: Inserting 1 Global Affiliate Ad (ID: ${randomAd.organizationId})`,
         );
       } else {
         // Fallback if pool calculation was off (shouldn't happen given check above)
@@ -246,17 +261,22 @@ function buildGlobalPool(
   // --- 2. Paid Pool (Fills the rest) ---
   const paidSlots = totalSlots - allocatedAffiliateCount;
 
-  // Filter paid advertisers: remove user's affiliates to prevent domination
+  // Filter paid organizations: remove user's affiliates to prevent domination
   // (Unless they are purely paid, but this keeps logic consistent with your exclusion rule)
-  const eligiblePaidIds = paidAdvertiserIds.filter((id) => !excludeAffiliateIds.includes(id));
+  const eligiblePaidIds = paidOrgIds.filter(
+    (id) => !excludeAffiliateIds.includes(id),
+  );
 
   if (eligiblePaidIds.length > 0) {
-    const weightedAdvertiserPool = buildWeightedAdvertiserPool(eligiblePaidIds, advertiserProfiles);
+    const weightedOrgPool = buildWeightedOrganizationPool(
+      eligiblePaidIds,
+      organizationProfiles,
+    );
     const weightedAdDeck: AdReference[] = [];
 
     // Build Deck
-    weightedAdvertiserPool.forEach((advertiserId) => {
-      const ads = adsByAdvertiser.get(advertiserId);
+    weightedOrgPool.forEach((organizationId) => {
+      const ads = adsByOrganization.get(organizationId);
       if (ads && ads.length > 0) {
         weightedAdDeck.push(ads[Math.floor(Math.random() * ads.length)]);
       }
@@ -272,31 +292,37 @@ function buildGlobalPool(
       }
     }
   } else {
-    // No paid advertisers? Fill with nulls.
+    // No paid organizations? Fill with nulls.
     for (let i = 0; i < paidSlots; i++) pool.push(null);
   }
 
   return pool;
 }
 
-function buildWeightedAdvertiserPool(
-  advertiserIds: string[],
-  advertiserProfiles: Map<string, AdvertiserProfile>
+function buildWeightedOrganizationPool(
+  organizationIds: string[],
+  organizationProfiles: Map<string, OrganizationProfile>,
 ): string[] {
   const weighted: string[] = [];
   const AD_CONFIG = {
-    paidTierWeights: { tier1: 1.0, tier2: 2.5, tier3: 5.5, tier4: 12, tier5: 25 },
+    paidTierWeights: {
+      tier1: 1.0,
+      tier2: 2.5,
+      tier3: 5.5,
+      tier4: 12,
+      tier5: 25,
+    },
   };
 
-  for (const advertiserId of advertiserIds) {
-    const profile = advertiserProfiles.get(advertiserId);
+  for (const organizationId of organizationIds) {
+    const profile = organizationProfiles.get(organizationId);
     if (!profile?.paidConfig) continue;
 
     const tier = profile.paidConfig.tier;
     const weightKey = `tier${tier}` as keyof typeof AD_CONFIG.paidTierWeights;
     const weight = AD_CONFIG.paidTierWeights[weightKey];
 
-    for (let i = 0; i < weight; i++) weighted.push(advertiserId);
+    for (let i = 0; i < weight; i++) weighted.push(organizationId);
   }
 
   return weighted;

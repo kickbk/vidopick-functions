@@ -9,22 +9,25 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 interface CreateInviteRequest {
-  name: string; // Inviter name (e.g., "Candee Land")
-  advertiserId?: string; // Optional: Link to advertiser for ad targeting
-  playlists?: string[]; // Optional: YouTube playlist IDs
-  slug?: string; // Optional: Custom slug
-  ttl?: string; // Optional: Expiration date (ISO string)
-  ogTitle?: string; // Optional: Custom OG title
-  ogDescription?: string; // Optional: Custom OG description
-  ogImage?: string; // Optional: Custom OG image
+  name: string;               // Inviter name (e.g., "Candee Land")
+  organizationId?: string;
+  organizationName?: string;  // Stored in params so app doesn't need a Firestore fetch
+  memberId?: string;
+  memberName?: string;        // Stored in params so app doesn't need a Firestore fetch
+  playlists?: string[];
+  slug?: string;
+  ttl?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImage?: string;
 }
 
 /**
  * Create an invite link
  *
  * Permissions:
- * - Admin: Can create invite for any advertiser
- * - Advertiser: Can only create invite for their own advertiserId
+ * - Admin: Can create invite for any organization
+ * - Organization: Can only create invite for their own organizationId
  */
 export const createInvite = onCall(async (request) => {
   // Must be authenticated
@@ -33,33 +36,41 @@ export const createInvite = onCall(async (request) => {
   }
 
   const data = request.data as CreateInviteRequest;
-  const { name, advertiserId, playlists = [], slug, ttl, ogTitle, ogDescription, ogImage } = data;
+  const {
+    name,
+    organizationId,
+    organizationName,
+    memberId,
+    memberName,
+    playlists = [],
+    slug,
+    ttl,
+    ogTitle,
+    ogDescription,
+    ogImage,
+  } = data;
 
-  // Validate required fields
   if (!name) {
     throw new HttpsError('invalid-argument', 'Name is required');
   }
 
-  // Check permissions
   const isAdmin = request.auth.token.role === 'admin';
-  const isAdvertiser = request.auth.token.role === 'advertiser';
-  const userAdvertiserId = request.auth.token.advertiserId;
+  const isOrganization = request.auth.token.role === 'organization';
+  const isMember = request.auth.token.role === 'member';
+  const userOrganizationId = request.auth.token.organizationId as string | undefined;
+  const userMemberId = request.auth.token.memberId as string | undefined;
 
-  // Must be either admin or advertiser
-  if (!isAdmin && !isAdvertiser) {
-    throw new HttpsError('permission-denied', 'Only admins and advertisers can create invites');
+  if (!isAdmin && !isOrganization && !isMember) {
+    throw new HttpsError('permission-denied', 'Only admins, organizations, and members can create invites');
   }
 
-  // Advertisers can only create invites for themselves
-  if (isAdvertiser && advertiserId && advertiserId !== userAdvertiserId) {
-    throw new HttpsError(
-      'permission-denied',
-      'Advertisers can only create invites for their own account'
-    );
+  if ((isOrganization || isMember) && organizationId && organizationId !== userOrganizationId) {
+    throw new HttpsError('permission-denied', 'You can only create invites for your own organization');
   }
 
-  // If advertiser but no advertiserId provided, use their own
-  const finalAdvertiserId = isAdvertiser && !advertiserId ? userAdvertiserId : advertiserId;
+  // Auto-fill from token claims for org/member users
+  const finalOrganizationId = (!isAdmin && userOrganizationId) ? userOrganizationId : organizationId;
+  const finalMemberId = isMember ? userMemberId : memberId;
 
   // Reserve ID (either custom slug or generate random)
   let id: string;
@@ -117,7 +128,10 @@ export const createInvite = onCall(async (request) => {
     },
     params: {
       name,
-      ...(finalAdvertiserId ? { advertiserId: finalAdvertiserId } : {}),
+      ...(finalOrganizationId ? { organizationId: finalOrganizationId } : {}),
+      ...(organizationName ? { organizationName } : {}),
+      ...(finalMemberId ? { memberId: finalMemberId } : {}),
+      ...(memberName ? { memberName } : {}),
       ...(playlists && playlists.length > 0 ? { playlists } : {}),
     },
     analytics: {},
@@ -169,24 +183,27 @@ export const updateInvite = onCall(async (request) => {
 
   let isOwner = false;
 
-  // Check if user owns this invite (either created it OR is the advertiser)
   if (!isAdmin) {
-    // Check if they created it
     if (invite?.createdBy === request.auth.uid) {
       isOwner = true;
-    } else {
-      // Check if they're the advertiser
-      const advertiserSnapshot = await db
-        .collection('advertisers')
+    } else if (request.auth.token.role === 'organization') {
+      const orgSnapshot = await db
+        .collection('organizations')
         .where('authUid', '==', request.auth.uid)
         .limit(1)
         .get();
-
-      if (!advertiserSnapshot.empty) {
-        const advertiserId = advertiserSnapshot.docs[0].id;
-        if (invite?.params?.advertiserId === advertiserId) {
-          isOwner = true;
-        }
+      if (!orgSnapshot.empty && invite?.params?.organizationId === orgSnapshot.docs[0].id) {
+        isOwner = true;
+      }
+    } else if (request.auth.token.role === 'member') {
+      const tokenMemberId = request.auth.token.memberId as string | undefined;
+      const tokenOrgId = request.auth.token.organizationId as string | undefined;
+      if (
+        tokenMemberId &&
+        invite?.params?.memberId === tokenMemberId &&
+        invite?.params?.organizationId === tokenOrgId
+      ) {
+        isOwner = true;
       }
     }
   }
@@ -205,8 +222,20 @@ export const updateInvite = onCall(async (request) => {
     updateData.linkTitle = `${updates.name} invites you to try Vidopick`;
   }
 
-  if (updates.advertiserId !== undefined) {
-    updateData['params.advertiserId'] = updates.advertiserId;
+  if (updates.organizationId !== undefined) {
+    updateData['params.organizationId'] = updates.organizationId;
+  }
+
+  if (updates.organizationName !== undefined) {
+    updateData['params.organizationName'] = updates.organizationName;
+  }
+
+  if (updates.memberId !== undefined) {
+    updateData['params.memberId'] = updates.memberId;
+  }
+
+  if (updates.memberName !== undefined) {
+    updateData['params.memberName'] = updates.memberName;
   }
 
   if (updates.playlists !== undefined) {
@@ -267,22 +296,22 @@ export const deleteInvite = onCall(async (request) => {
 
   let isOwner = false;
 
-  // Check if user owns this invite (either created it OR is the advertiser)
+  // Check if user owns this invite (either created it OR is the organization)
   if (!isAdmin) {
     // Check if they created it
     if (invite?.createdBy === request.auth.uid) {
       isOwner = true;
     } else {
-      // Check if they're the advertiser
-      const advertiserSnapshot = await db
-        .collection('advertisers')
+      // Check if they're the organization
+      const orgSnapshot = await db
+        .collection('organizations')
         .where('authUid', '==', request.auth.uid)
         .limit(1)
         .get();
 
-      if (!advertiserSnapshot.empty) {
-        const advertiserId = advertiserSnapshot.docs[0].id;
-        if (invite?.params?.advertiserId === advertiserId) {
+      if (!orgSnapshot.empty) {
+        const orgId = orgSnapshot.docs[0].id;
+        if (invite?.params?.organizationId === orgId) {
           isOwner = true;
         }
       }
@@ -305,44 +334,51 @@ export const deleteInvite = onCall(async (request) => {
 /**
  * List invites
  * Admin: See all invites
- * Advertiser: See invites for their advertiser account (by params.advertiserId)
+ * Organization: See invites for their organization account (by params.organizationId)
  */
 export const listInvites = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be logged in');
   }
 
-  const isAdmin = request.auth.token.role === 'admin';
+  const role = request.auth.token.role as string | undefined;
+  const isAdmin = role === 'admin';
+  const isMember = role === 'member';
   const uid = request.auth.uid;
 
   try {
     let query = db.collection('shortLinks');
 
-    // If not admin, find advertiser by authUid and filter by params.advertiserId
-    if (!isAdmin) {
-      // Find advertiser document where authUid matches
-      const advertiserSnapshot = await db
-        .collection('advertisers')
+    if (isMember) {
+      // Members have organizationId + memberId in their JWT claims — no Firestore lookup needed.
+      // Show only invites they created (filtered by memberId).
+      const memberId = request.auth.token.memberId as string | undefined;
+      const organizationId = request.auth.token.organizationId as string | undefined;
+
+      if (!memberId || !organizationId) {
+        return { success: true, invites: [] };
+      }
+
+      query = query.where('params.memberId', '==', memberId) as any;
+    } else if (!isAdmin) {
+      // Organization account — look up org by authUid
+      const orgSnapshot = await db
+        .collection('organizations')
         .where('authUid', '==', uid)
         .limit(1)
         .get();
 
-      if (advertiserSnapshot.empty) {
-        // No advertiser found for this user
-        console.log(`No advertiser found for user ${uid}`);
-        return {
-          success: true,
-          invites: [],
-        };
+      if (orgSnapshot.empty) {
+        console.log(`No organization found for user ${uid}`);
+        return { success: true, invites: [] };
       }
 
-      const advertiserDoc = advertiserSnapshot.docs[0];
-      const advertiserId = advertiserDoc.id;
+      const orgDoc = orgSnapshot.docs[0];
+      const organizationId = orgDoc.id;
 
-      console.log(`Found advertiser ${advertiserId} for user ${uid}`);
+      console.log(`Found organization ${organizationId} for user ${uid}`);
 
-      // Filter invites by params.advertiserId
-      query = query.where('params.advertiserId', '==', advertiserId) as any;
+      query = query.where('params.organizationId', '==', organizationId) as any;
     }
 
     // Try to order by createdAt (might need Firestore index)
@@ -370,4 +406,3 @@ export const listInvites = onCall(async (request) => {
     throw new HttpsError('internal', `Failed to list invites: ${error.message}`);
   }
 });
-

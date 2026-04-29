@@ -9,11 +9,11 @@
  * Then follow the prompts to create an advertiser
  */
 
-const admin = require('firebase-admin');
-const readline = require('readline');
+const admin = require("firebase-admin");
+const readline = require("readline");
 
 // Initialize Firebase Admin
-const serviceAccount = require('./serviceAccountKey.json'); // You'll need to download this
+const serviceAccount = require("../integrations/firebase/service-account.json");
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -31,19 +31,21 @@ function question(query) {
 }
 
 async function createAdvertiser() {
-  console.log('\n🎯 Create New Advertiser\n');
+  console.log("\n🎯 Create New Advertiser\n");
 
   // Get advertiser details
   const name = await question('Advertiser name (e.g., "Candeeland Burbank"): ');
-  const id = await question('Document ID (e.g., "candeelandburbank" - lowercase, no spaces): ');
-  const type = await question('Type (affiliate/paid/both): ');
+  const id = await question(
+    'Document ID (e.g., "candeelandburbank" - lowercase, no spaces): ',
+  );
+  const type = await question("Type (affiliate/paid/both): ");
 
   const roles = [];
-  if (type.includes('affiliate') || type.includes('both')) {
-    roles.push('affiliate');
+  if (type.includes("affiliate") || type.includes("both")) {
+    roles.push("affiliate");
   }
-  if (type.includes('paid') || type.includes('both')) {
-    roles.push('paid');
+  if (type.includes("paid") || type.includes("both")) {
+    roles.push("paid");
   }
 
   const advertiserData = {
@@ -56,8 +58,8 @@ async function createAdvertiser() {
   };
 
   // Paid config
-  if (roles.includes('paid')) {
-    const tier = await question('Tier (1-5): ');
+  if (roles.includes("paid")) {
+    const tier = await question("Tier (1-5): ");
     const tierWeights = { 1: 1.0, 2: 2.5, 3: 5.5, 4: 12, 5: 25 };
     const monthlyPrices = { 1: 100, 2: 250, 3: 500, 4: 1000, 5: 2500 };
 
@@ -65,43 +67,43 @@ async function createAdvertiser() {
       tier: parseInt(tier),
       weight: tierWeights[tier],
       monthlyPrice: monthlyPrices[tier],
-      billingStatus: 'active',
+      billingStatus: "active",
     };
   }
 
   // Optional fields
-  const address = await question('Address (optional, press enter to skip): ');
+  const address = await question("Address (optional, press enter to skip): ");
   if (address) advertiserData.address = address;
 
-  const phone = await question('Phone (optional): ');
+  const phone = await question("Phone (optional): ");
   if (phone) advertiserData.phone = phone;
 
-  const website = await question('Website (optional): ');
+  const website = await question("Website (optional): ");
   if (website) advertiserData.website = website;
 
-  const logo = await question('Logo URL (optional): ');
+  const logo = await question("Logo URL (optional): ");
   if (logo) advertiserData.logo = logo;
 
-  console.log('\n📄 Creating advertiser with data:');
+  console.log("\n📄 Creating advertiser with data:");
   console.log(JSON.stringify(advertiserData, null, 2));
 
-  const confirm = await question('\nCreate this advertiser? (yes/no): ');
+  const confirm = await question("\nCreate this advertiser? (yes/no): ");
 
-  if (confirm.toLowerCase() !== 'yes') {
-    console.log('❌ Cancelled');
+  if (confirm.toLowerCase() !== "yes") {
+    console.log("❌ Cancelled");
     rl.close();
     return;
   }
 
   try {
-    await db.collection('advertisers').doc(id).set(advertiserData);
-    console.log('✅ Advertiser created successfully!');
+    await db.collection("organizations").doc(id).set(advertiserData);
+    console.log("✅ Advertiser created successfully!");
     console.log(`\n📍 Document ID: ${id}`);
     console.log(
-      `🔗 Firestore URL: https://console.firebase.google.com/project/vidopick-c725d/firestore/data/advertisers/${id}`
+      `🔗 Firestore URL: https://console.firebase.google.com/project/vidopick-c725d/firestore/data/advertisers/${id}`,
     );
   } catch (error) {
-    console.error('❌ Error creating advertiser:', error);
+    console.error("❌ Error creating advertiser:", error);
   }
 
   rl.close();

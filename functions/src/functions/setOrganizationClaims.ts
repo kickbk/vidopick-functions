@@ -8,13 +8,13 @@ if (!admin.apps.length) {
 }
 
 /**
- * Cloud Function that sets custom claims for advertiser users
- * Triggered when authUid field is added to an advertiser document
+ * Cloud Function that sets custom claims for organization users.
+ * Triggered when authUid field is added to an organization document.
  */
-export const setAdvertiserClaims = onDocumentUpdated(
-  'advertisers/{advertiserId}',
+export const setOrganizationClaims = onDocumentUpdated(
+  'organizations/{organizationId}',
   async (event) => {
-    const advertiserId = event.params.advertiserId;
+    const organizationId = event.params.organizationId;
     const beforeData = event.data?.before.data();
     const afterData = event.data?.after.data();
 
@@ -30,13 +30,13 @@ export const setAdvertiserClaims = onDocumentUpdated(
       try {
         // Set custom claims
         await admin.auth().setCustomUserClaims(authUid, {
-          role: 'advertiser',
-          advertiserId: advertiserId,
+          role: 'organization',
+          organizationId,
         });
 
-        console.log(`Custom claims set for advertiser ${advertiserId} (uid: ${authUid})`);
+        console.log(`Custom claims set for organization ${organizationId} (uid: ${authUid})`);
 
-        // Optionally update the advertiser document to confirm claims were set
+        // Update the organization document to confirm claims were set
         await event.data?.after.ref.update({
           claimsSet: true,
           claimsSetAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -54,25 +54,23 @@ export const setAdvertiserClaims = onDocumentUpdated(
 );
 
 /**
- * Alternative: HTTP Callable Function (if you prefer manual triggering)
- * Call from admin UI after creating account
+ * HTTP Callable: manually set organization claims (admin only)
  */
-export const setAdvertiserClaimsManual = onCall(async (request) => {
-  // Verify caller is admin
+export const setOrganizationClaimsManual = onCall(async (request) => {
   if (!request.auth || request.auth.token.role !== 'admin') {
-    throw new HttpsError('permission-denied', 'Only admins can set advertiser claims');
+    throw new HttpsError('permission-denied', 'Only admins can set organization claims');
   }
 
-  const { authUid, advertiserId } = request.data;
+  const { authUid, organizationId } = request.data;
 
-  if (!authUid || !advertiserId) {
-    throw new HttpsError('invalid-argument', 'authUid and advertiserId are required');
+  if (!authUid || !organizationId) {
+    throw new HttpsError('invalid-argument', 'authUid and organizationId are required');
   }
 
   try {
     await admin.auth().setCustomUserClaims(authUid, {
-      role: 'advertiser',
-      advertiserId: advertiserId,
+      role: 'organization',
+      organizationId,
     });
 
     return { success: true, message: 'Custom claims set successfully' };

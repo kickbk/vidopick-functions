@@ -10,7 +10,7 @@ if (!admin.apps.length) {
 
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
 const SENDER_EMAIL = 'vidopickhelp@gmail.com';
-const DEMO_ADVERTISER_ID = process.env.DEMO_ADVERTISER_ID;
+const DEMO_ORGANIZATION_ID = process.env.DEMO_ORGANIZATION_ID;
 const DEMO_EMAIL = 'vidopick@gmail.com';
 
 const ALLOWED_ORIGINS = ['https://vidopick.com', 'http://localhost:5173'];
@@ -40,7 +40,7 @@ export const sendDemoInvite = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'Invalid email format');
   }
 
-  if (!DEMO_ADVERTISER_ID) {
+  if (!DEMO_ORGANIZATION_ID) {
     throw new HttpsError('internal', 'Demo account not configured');
   }
 
@@ -50,13 +50,13 @@ export const sendDemoInvite = onCall(async (request) => {
 
   // Check session availability
   const db = admin.firestore();
-  const advertiserSnap = await db.doc(`advertisers/${DEMO_ADVERTISER_ID}`).get();
+  const organizationSnap = await db.doc(`organizations/${DEMO_ORGANIZATION_ID}`).get();
 
-  if (!advertiserSnap.exists) {
+  if (!organizationSnap.exists) {
     throw new HttpsError('not-found', 'Demo account not found');
   }
 
-  const data = advertiserSnap.data()!;
+  const data = organizationSnap.data()!;
 
   if (data.demoSessionActive) {
     const lockedAt: admin.firestore.Timestamp | undefined = data.demoSessionLockedAt;

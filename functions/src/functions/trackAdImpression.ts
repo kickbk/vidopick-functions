@@ -5,7 +5,7 @@ const db = getFirestore();
 
 interface AdImpression {
   adId: string;
-  advertiserId: string;
+  organizationId: string;
   deviceId: string;
   platform: 'ios' | 'android' | 'tv';
   timestamp: number;
@@ -44,17 +44,17 @@ export const trackAdImpression = onRequest(
       const updates: { [key: string]: any } = {};
 
       for (const impression of impressions) {
-        const { adId, advertiserId, platform, wasSkipped, timeToSkip, wasSaved, wasClicked } =
+        const { adId, organizationId, platform, wasSkipped, timeToSkip, wasSaved, wasClicked } =
           impression;
 
         // Update ad document stats
-        const adRef = db.collection('advertisers').doc(advertiserId).collection('ads').doc(adId);
+        const adRef = db.collection('organizations').doc(organizationId).collection('ads').doc(adId);
 
         // Aggregate updates per ad
         if (!updates[adId]) {
           updates[adId] = {
             ref: adRef,
-            advertiserId,
+            organizationId,
             impressions: 0,
             skips: 0,
             saves: 0,
@@ -98,7 +98,7 @@ export const trackAdImpression = onRequest(
 
       for (const adId in updates) {
         const data = updates[adId];
-        const { ref, advertiserId, timeToSkipSum, timeToSkipCount, ...incrementData } = data;
+        const { ref, organizationId, timeToSkipSum, timeToSkipCount, ...incrementData } = data;
 
         try {
           // Use set with merge instead of update to avoid document existence check

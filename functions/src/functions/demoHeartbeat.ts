@@ -5,7 +5,7 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-const DEMO_ADVERTISER_ID = process.env.DEMO_ADVERTISER_ID;
+const DEMO_ORGANIZATION_ID = process.env.DEMO_ORGANIZATION_ID;
 
 /**
  * Called every 2 minutes from the client while the demo account is active.
@@ -18,12 +18,12 @@ export const demoHeartbeat = onCall(async (request) => {
     throw new HttpsError('unauthenticated', 'Must be signed in');
   }
 
-  if (!DEMO_ADVERTISER_ID) {
+  if (!DEMO_ORGANIZATION_ID) {
     throw new HttpsError('internal', 'Demo account not configured');
   }
 
   const db = admin.firestore();
-  await db.doc(`advertisers/${DEMO_ADVERTISER_ID}`).update({
+  await db.doc(`organizations/${DEMO_ORGANIZATION_ID}`).update({
     lastDemoActivity: admin.firestore.FieldValue.serverTimestamp(),
   });
 

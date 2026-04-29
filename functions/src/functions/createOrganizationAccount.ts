@@ -17,20 +17,20 @@ function resolveAppUrl(appOrigin?: string): string {
 }
 
 /**
- * Create an advertiser account server-side, then automatically send an invite email
- * with a magic sign-in link. No passwords involved — advertiser clicks the link to access
+ * Create an organization account server-side, then automatically send an invite email
+ * with a magic sign-in link. No passwords involved — org user clicks the link to access
  * their account, and requests new links from the login page for future sign-ins.
  */
-export const createAdvertiserAccount = onCall(async (request) => {
+export const createOrganizationAccount = onCall(async (request) => {
   if (!request.auth || request.auth.token.role !== 'admin') {
-    throw new HttpsError('permission-denied', 'Only admins can create advertiser accounts');
+    throw new HttpsError('permission-denied', 'Only admins can create organization accounts');
   }
 
-  const { email, advertiserId, appOrigin } = request.data;
+  const { email, organizationId, appOrigin } = request.data;
   const APP_URL = resolveAppUrl(appOrigin);
 
-  if (!email || !advertiserId) {
-    throw new HttpsError('invalid-argument', 'Email and advertiserId are required');
+  if (!email || !organizationId) {
+    throw new HttpsError('invalid-argument', 'Email and organizationId are required');
   }
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -40,44 +40,51 @@ export const createAdvertiserAccount = onCall(async (request) => {
 
   const db = admin.firestore();
 
-  // Check advertiser exists BEFORE creating the Auth user (prevents orphan accounts)
-  const advertiserRef = db.doc(`advertisers/${advertiserId}`);
-  const advertiserSnap = await advertiserRef.get();
+  // Check organization exists BEFORE creating the Auth user (prevents orphan accounts)
+  const organizationRef = db.doc(`organizations/${organizationId}`);
+  const organizationSnap = await organizationRef.get();
 
-  if (!advertiserSnap.exists) {
-    throw new HttpsError('not-found', `Advertiser ID '${advertiserId}' does not exist.`);
+  if (!organizationSnap.exists) {
+    throw new HttpsError('not-found', `Organization ID '${organizationId}' does not exist.`);
   }
 
-  const advertiserName: string = advertiserSnap.data()!.name || 'there';
+  const organizationName: string = organizationSnap.data()!.name || 'there';
 
   try {
-    // Create Firebase Auth account with a random temp password the advertiser never uses
-    const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
-    const userRecord = await admin.auth().createUser({
-      email,
-      password: tempPassword,
-      emailVerified: false,
-    });
-
-    console.log(`Created user ${userRecord.uid} for ${email}`);
+    // Create Firebase Auth account, or reuse an existing one if the email is
+    // already registered (e.g. a Pro app-user who is also an org admin).
+    let userRecord: admin.auth.UserRecord;
+    try {
+      const tempPassword = Math.random().toString(36).slice(-12) + 'A1!';
+      userRecord = await admin.auth().createUser({
+        email,
+        password: tempPassword,
+        emailVerified: false,
+      });
+      console.log(`Created user ${userRecord.uid} for ${email}`);
+    } catch (createErr: any) {
+      if (createErr.code !== 'auth/email-already-exists') throw createErr;
+      userRecord = await admin.auth().getUserByEmail(email);
+      console.log(`Reusing existing user ${userRecord.uid} for ${email}`);
+    }
 
     // Set custom claims immediately
     await admin.auth().setCustomUserClaims(userRecord.uid, {
-      role: 'advertiser',
-      advertiserId,
+      role: 'organization',
+      organizationId,
     });
 
-    console.log(`Set advertiser claims for ${userRecord.uid}`);
+    console.log(`Set organization claims for ${userRecord.uid}`);
 
     // Update Firestore
-    await advertiserRef.update({
+    await organizationRef.update({
       authUid: userRecord.uid,
       accountCreatedAt: admin.firestore.FieldValue.serverTimestamp(),
       claimsSet: true,
       claimsSetAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    console.log(`Updated Firestore for advertiser ${advertiserId}`);
+    console.log(`Updated Firestore for organization ${organizationId}`);
 
     // Generate magic sign-in link and send invite email
     const continueUrl = `${APP_URL}/admin/auth/email-action/?email=${encodeURIComponent(email)}`;
@@ -92,7 +99,7 @@ export const createAdvertiserAccount = onCall(async (request) => {
         from: 'Vidopick <hello@vidopick.com>',
         to: email,
         subject: "You're invited to Vidopick",
-        html: buildInviteEmail(advertiserName, signInLink),
+        html: buildInviteEmail(organizationName, signInLink),
       });
       console.log(`Sent invite email to ${email}`);
     } else {
@@ -105,11 +112,7 @@ export const createAdvertiserAccount = onCall(async (request) => {
       uid: userRecord.uid,
     };
   } catch (error: any) {
-    console.error('Error creating advertiser account:', error);
-
-    if (error.code === 'auth/email-already-exists') {
-      throw new HttpsError('already-exists', 'An account with this email already exists');
-    }
+    console.error('Error creating organization account:', error);
 
     if (error instanceof HttpsError) {
       throw error;

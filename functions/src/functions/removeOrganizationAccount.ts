@@ -6,31 +6,31 @@ if (!admin.apps.length) {
 }
 
 /**
- * Removes an advertiser's login access:
+ * Removes an organization's login access:
  * - Deletes the Firebase Auth user
  * - Nulls authUid in Firestore
- * The advertiser record itself is preserved.
+ * The organization record itself is preserved.
  */
-export const removeAdvertiserAccount = onCall(async (request) => {
+export const removeOrganizationAccount = onCall(async (request) => {
   if (!request.auth || request.auth.token.role !== 'admin') {
     throw new HttpsError('permission-denied', 'Only admins can remove account access');
   }
 
-  const { advertiserId } = request.data;
+  const { organizationId } = request.data;
 
-  if (!advertiserId) {
-    throw new HttpsError('invalid-argument', 'advertiserId is required');
+  if (!organizationId) {
+    throw new HttpsError('invalid-argument', 'organizationId is required');
   }
 
   const db = admin.firestore();
-  const advertiserRef = db.doc(`advertisers/${advertiserId}`);
-  const advertiserSnap = await advertiserRef.get();
+  const organizationRef = db.doc(`organizations/${organizationId}`);
+  const organizationSnap = await organizationRef.get();
 
-  if (!advertiserSnap.exists) {
-    throw new HttpsError('not-found', 'Advertiser not found');
+  if (!organizationSnap.exists) {
+    throw new HttpsError('not-found', 'Organization not found');
   }
 
-  const { authUid } = advertiserSnap.data()!;
+  const { authUid } = organizationSnap.data()!;
 
   if (authUid) {
     try {
@@ -44,14 +44,14 @@ export const removeAdvertiserAccount = onCall(async (request) => {
     }
   }
 
-  await advertiserRef.update({
+  await organizationRef.update({
     authUid: null,
     claimsSet: false,
     claimsSetAt: null,
     accountCreatedAt: null,
   });
 
-  console.log(`Removed account access for advertiser ${advertiserId}`);
+  console.log(`Removed account access for organization ${organizationId}`);
 
   return { success: true, message: 'Account access removed and Firebase Auth user deleted' };
 });

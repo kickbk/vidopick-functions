@@ -6,7 +6,7 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-const DEMO_ADVERTISER_ID = process.env.DEMO_ADVERTISER_ID;
+const DEMO_ORGANIZATION_ID = process.env.DEMO_ORGANIZATION_ID;
 const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
 /**
@@ -19,19 +19,19 @@ export const acquireDemoSession = onCall(async (request) => {
     throw new HttpsError('unauthenticated', 'Must be signed in');
   }
 
-  if (!DEMO_ADVERTISER_ID) {
+  if (!DEMO_ORGANIZATION_ID) {
     throw new HttpsError('internal', 'Demo account not configured');
   }
 
   const { recipientEmail } = request.data;
 
   const db = admin.firestore();
-  const advertiserRef = db.doc(`advertisers/${DEMO_ADVERTISER_ID}`);
+  const organizationRef = db.doc(`organizations/${DEMO_ORGANIZATION_ID}`);
 
   // Use a transaction to atomically check-and-set the session lock
   const acquired = await db.runTransaction(async (tx) => {
-    const snap = await tx.get(advertiserRef);
-    if (!snap.exists) throw new HttpsError('not-found', 'Demo advertiser not found');
+    const snap = await tx.get(organizationRef);
+    if (!snap.exists) throw new HttpsError('not-found', 'Demo organization not found');
 
     const data = snap.data()!;
 
@@ -46,7 +46,7 @@ export const acquireDemoSession = onCall(async (request) => {
       }
     }
 
-    tx.update(advertiserRef, {
+    tx.update(organizationRef, {
       demoSessionActive: true,
       demoSessionLockedAt: admin.firestore.FieldValue.serverTimestamp(),
       lastDemoActivity: admin.firestore.FieldValue.serverTimestamp(),

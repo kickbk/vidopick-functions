@@ -13,6 +13,7 @@ const db = admin.firestore();
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const EMAIL_ACCOUNT = process.env.EMAIL_ACCOUNT;
 const EMAIL_PASS = process.env.EMAIL_PASS;
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 // const MIN_VIDEOS = 5;
 
 // --- HELPER DATA ---
@@ -87,12 +88,46 @@ function calculateEngagementScore(views: number[]): number {
   return 6;
 }
 
+async function fetchPlaylistFromApi(playlistId: string): Promise<any> {
+  if (!YOUTUBE_API_KEY) throw new Error('Missing YOUTUBE_API_KEY');
+
+  const [playlistRes, itemsRes] = await Promise.all([
+    axios.get('https://www.googleapis.com/youtube/v3/playlists', {
+      params: { part: 'snippet,contentDetails', id: playlistId, key: YOUTUBE_API_KEY },
+      timeout: 8000,
+    }),
+    axios.get('https://www.googleapis.com/youtube/v3/playlistItems', {
+      params: { part: 'snippet', playlistId, maxResults: 10, key: YOUTUBE_API_KEY },
+      timeout: 8000,
+    }),
+  ]);
+
+  const playlist = playlistRes.data.items?.[0];
+  if (!playlist) throw new Error('PLAYLIST_NOT_FOUND');
+
+  const snippet = playlist.snippet;
+  const videoItems: any[] = itemsRes.data.items ?? [];
+  const videoTitles = videoItems.map((item: any) => item.snippet?.title).filter(Boolean);
+  const firstVideoId = videoItems[0]?.snippet?.resourceId?.videoId ?? null;
+
+  return {
+    id: playlistId,
+    title: decodeHtmlEntities(snippet.title ?? 'Unknown Playlist'),
+    author: decodeHtmlEntities(snippet.channelTitle ?? 'YouTube Channel'),
+    channelId: snippet.channelId ?? null,
+    videoTitles,
+    videoViews: [],
+    firstVideoId,
+    totalCount: playlist.contentDetails?.itemCount ?? videoTitles.length,
+  };
+}
+
 async function fetchPlaylistXml(playlistId: string): Promise<any> {
   const url = `https://www.youtube.com/feeds/videos.xml?playlist_id=${playlistId}`;
   try {
     const response = await axios.get(url, { timeout: 8000 });
     const xml = response.data;
-    const mainTitleMatch = xml.match(/<title>(.*?)<\/title>/); 
+    const mainTitleMatch = xml.match(/<title>(.*?)<\/title>/);
     const playlistTitle = mainTitleMatch ? decodeHtmlEntities(mainTitleMatch[1]) : 'Unknown Playlist';
     const nameMatch = xml.match(/<name>(.*?)<\/name>/);
     const author = nameMatch ? decodeHtmlEntities(nameMatch[1]) : 'YouTube Channel';
@@ -110,7 +145,10 @@ async function fetchPlaylistXml(playlistId: string): Promise<any> {
 
     return { id: playlistId, title: playlistTitle, author, channelId, videoTitles, videoViews, firstVideoId, totalCount: videoTitles.length };
   } catch (error: any) {
-    if (error.response?.status === 404) throw new Error('PLAYLIST_NOT_FOUND');
+    if (error.response?.status === 404) {
+      // RSS feed doesn't serve unlisted playlists — fall back to YouTube Data API
+      return fetchPlaylistFromApi(playlistId);
+    }
     throw error;
   }
 }
@@ -188,13 +226,11 @@ export const analyzeSharedPlaylist = onRequest(
     console.log(`Processing shared playlist: ${playlistId}`);
 
     try {
-      const docRef = db.collection('scannedPlaylists').doc(playlistId);
-      
-      // OPTIMIZATION: Check if already exists globally
-      const docSnap = await docRef.get();
-      if (docSnap.exists) {
-        console.log('Playlist already exists. Returning cached data.');
-        response.status(200).json(docSnap.data());
+      // Check scannedPlaylists — covers both approved and previously-scanned records
+      const existingSnap = await db.collection('scannedPlaylists').doc(playlistId).get();
+      if (existingSnap.exists) {
+        console.log(`[analyzeSharedPlaylist] found in scannedPlaylists, returning cached`);
+        response.status(200).json(existingSnap.data());
         return;
       }
 
@@ -281,15 +317,15 @@ export const analyzeSharedPlaylist = onRequest(
         likes: 0
       };
 
-      // 5. Save & Notify
+      // 5. Save to scannedPlaylists with isApproved: false (pending admin review) & Notify
       if (result.isAppropriate) {
-        await docRef.set(result);
-        console.log(`Saved new playlist ${playlistId} to global collection (pending review).`);
-        
+        await db.collection('scannedPlaylists').doc(playlistId).set(result);
+        console.log(`[analyzeSharedPlaylist] saved ${playlistId} to scannedPlaylists (pending review)`);
+
         // Fire & Forget Email Notification (don't block response)
         sendModerationEmail(result).catch(e => console.error("Email failed", e));
       } else {
-        console.log(`Playlist ${playlistId} flagged as inappropriate. Not saving.`);
+        console.log(`[analyzeSharedPlaylist] playlist ${playlistId} flagged as inappropriate, not saving`);
       }
 
       response.status(200).json(result);

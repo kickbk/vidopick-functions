@@ -46,14 +46,24 @@ export const savePlaylistFromExtension = onRequest(
     }
 
     try {
-      // Write directly to Firestore using Admin SDK
+      const playlistId = playlistData.id;
+
+      // Check if already in scannedPlaylists (previously scanned by a user — isApproved: false).
+      // If so, merge the existing AI data with the extension-provided data so we don't lose it.
+      const existingSnap = await db.collection('scannedPlaylists').doc(playlistId).get();
+      const existingData = existingSnap.exists ? existingSnap.data() : null;
+
+      const dataToSave = existingData
+        ? { ...existingData, ...playlistData, isApproved: true }
+        : { ...playlistData, isApproved: true };
+
       await db
         .collection('scannedPlaylists')
-        .doc(playlistData.id)
-        .set(playlistData, { merge: true });
+        .doc(playlistId)
+        .set(dataToSave, { merge: true });
 
-      console.log('Playlist saved successfully:', playlistData.id);
-      response.status(200).json({ success: true, id: playlistData.id });
+      console.log(`[savePlaylistFromExtension] saved ${playlistId} (promoted=${!!existingData})`);
+      response.status(200).json({ success: true, id: playlistId });
     } catch (error: any) {
       console.error('Error saving playlist:', error);
       response.status(500).json({
