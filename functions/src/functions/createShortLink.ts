@@ -31,7 +31,7 @@ type CreateBody = {
   analytics?: Record<string, any>;
   meta?: Record<string, any>;
   ttl?: string | number | Date | null; // optional expiration date/time
-  playlists?: Playlist[];
+  playlist?: Playlist;
   organizationId?: string;
 };
 
@@ -54,7 +54,7 @@ const makeDocData = (b: CreateBody) => ({
   },
   params: {
     ...(b.params ?? {}),
-    ...(b.playlists ? { playlists: b.playlists } : {}),
+    ...(b.playlist ? { playlist: b.playlist } : {}),
     // Ensure organizationId is in params for Firestore queries
     ...(b.organizationId ? { organizationId: b.organizationId } : {}),
   },

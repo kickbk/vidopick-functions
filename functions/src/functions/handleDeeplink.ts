@@ -87,8 +87,6 @@ function resolveOg(data: any) {
   const inviterName = data?.params?.name;
   const userCustomTitle = data?.meta?.ogTitle;
   const userCustomDescription = data?.meta?.ogDescription;
-  const template: 'invite' | 'profile' | 'generic' =
-    meta.template || data?.template || (inviterName ? 'invite' : 'generic');
 
   const inviteTail =
     'to try Vidopick, the child-safe video player where parents select YouTube playlists for kids to watch safely on their own.';
@@ -97,23 +95,36 @@ function resolveOg(data: any) {
   let ogDescription: string | undefined;
   let ogImage: string | undefined;
 
-  if (template === 'invite') {
-    ogTitle = meta.ogTitle || data?.linkTitle || 'Vidopick — the child-safe video player';
+  // Profile follow invites get distinct OG copy — no email exposed
+  const profileData = data?.params?.profile as { displayName?: string; name?: string } | undefined;
+  if (profileData) {
+    const profileName = profileData.displayName || profileData.name || 'Profile';
+    ogTitle = meta.ogTitle || `You're invited to follow ${profileName} on Vidopick`;
     ogDescription =
       meta.ogDescription ||
-      (inviterName ? `${inviterName} invites you ${inviteTail}` : `You're invited ${inviteTail}`);
-    ogImage = meta.ogImage || DEFAULT_OG_IMAGE;
-  } else if (template === 'profile') {
-    const username = data?.params?.username || data?.params?.handle || inviterName || 'User';
-    ogTitle = meta.ogTitle || `${username} on Vidopick`;
-    ogDescription = meta.ogDescription || `Explore ${username}'s playlists on Vidopick.`;
+      `${profileName} shared their curated playlists with you on Vidopick — the child-safe video player.`;
     ogImage = meta.ogImage || DEFAULT_OG_IMAGE;
   } else {
-    ogTitle = meta.ogTitle || data?.linkTitle || 'Vidopick';
-    ogDescription =
-      meta.ogDescription ||
-      'Vidopick lets parents pick YouTube playlists kids can safely watch on their own.';
-    ogImage = meta.ogImage || DEFAULT_OG_IMAGE;
+    const template: 'invite' | 'profile' | 'generic' =
+      meta.template || data?.template || (inviterName ? 'invite' : 'generic');
+    if (template === 'invite') {
+      ogTitle = meta.ogTitle || data?.linkTitle || 'Vidopick — the child-safe video player';
+      ogDescription =
+        meta.ogDescription ||
+        (inviterName ? `${inviterName} invites you ${inviteTail}` : `You're invited ${inviteTail}`);
+      ogImage = meta.ogImage || DEFAULT_OG_IMAGE;
+    } else if (template === 'profile') {
+      const username = data?.params?.username || data?.params?.handle || inviterName || 'User';
+      ogTitle = meta.ogTitle || `${username} on Vidopick`;
+      ogDescription = meta.ogDescription || `Explore ${username}'s playlists on Vidopick.`;
+      ogImage = meta.ogImage || DEFAULT_OG_IMAGE;
+    } else {
+      ogTitle = meta.ogTitle || data?.linkTitle || 'Vidopick';
+      ogDescription =
+        meta.ogDescription ||
+        'Vidopick lets parents pick YouTube playlists kids can safely watch on their own.';
+      ogImage = meta.ogImage || DEFAULT_OG_IMAGE;
+    }
   }
 
   ogTitle = clip(ogTitle, 80) || 'Vidopick';
@@ -250,7 +261,8 @@ app.get('/auth-redirect', async (req, res) => {
     qrSvg = await QRCode.toString(fullUrl, { type: 'svg', width: 220, margin: 2 });
   } catch (e) {
     console.error('[auth-redirect] QR generation failed:', e);
-    return res.status(200).send(`<!doctype html><html><body style="background:#0f172a;color:#e2e8f0;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:24px;">
+    return res.status(200)
+      .send(`<!doctype html><html><body style="background:#0f172a;color:#e2e8f0;font-family:sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:24px;">
       <div><h1 style="color:#fff;margin-bottom:12px;">Open this link on your phone</h1>
       <p style="color:#94a3b8;">Copy the link from your email and open it on your phone to sign in to Vidopick.</p></div>
     </body></html>`);
@@ -309,6 +321,11 @@ app.get('/:id', async (req, res) => {
     const data = doc.data() || {};
     const { ogTitle, ogDescription, ogImage, title, description } = resolveOg(data);
 
+    // Disabled (soft-deleted profile share)
+    if ((data as any).disabled === true) {
+      return res.redirect(302, `${ERROR_PAGES.expired}?id=${encodeURIComponent(id)}`);
+    }
+
     // TTL
     const ttl = (data as any).ttl;
     if (ttl && typeof ttl.toMillis === 'function' && Date.now() > ttl.toMillis()) {
@@ -318,13 +335,18 @@ app.get('/:id', async (req, res) => {
     const device: 'ios' | 'android' | 'desktop' = isIOS(ua)
       ? 'ios'
       : isAndroid(ua)
-      ? 'android'
-      : 'desktop';
+        ? 'android'
+        : 'desktop';
 
     // Derive playlist count for /get
     const ps = derivePlaylistCount(data); // 0..99
 
     // Params for /get — omit non-primitives to avoid bloating the URL
+    const profileData = (data as any)?.params?.profile as
+      | { displayName?: string; name?: string }
+      | undefined;
+    const isProfileInvite = !!profileData;
+
     const paramsObj: Record<string, string> = {
       ogTitle,
       ogDescription,
@@ -335,6 +357,11 @@ app.get('/:id', async (req, res) => {
       ...(title && { title }),
       ...(description && { desc: description }),
       ...(ttl && typeof ttl.toMillis === 'function' && { ttl: String(ttl.toMillis()) }),
+      // Profile follow invite — pass names only (no emails, no full snapshots)
+      ...(isProfileInvite && {
+        isProfileInvite: '1',
+        profileNames: profileData?.displayName || profileData?.name || 'Profile',
+      }),
     };
     const rawParams = (data as any)?.params || {};
     for (const [k, v] of Object.entries(rawParams)) {
@@ -342,9 +369,11 @@ app.get('/:id', async (req, res) => {
       const t = typeof v;
       if (t === 'string' || t === 'number' || t === 'boolean') {
         if (k === 'ps') continue; // keep derived ps
+        // For profile invites, omit 'name' — it could be an email address
+        if (isProfileInvite && k === 'name') continue;
         paramsObj[k] = String(v);
       }
-      // Arrays/objects (e.g., playlists) are intentionally not added to the querystring.
+      // Arrays/objects (e.g., playlists, profiles) are intentionally not added to the querystring.
     }
 
     const qs = new URLSearchParams(paramsObj).toString();

@@ -1,7 +1,7 @@
 import * as admin from 'firebase-admin';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 
-import { sendExpoPushNotifications } from '../utils/expoPush.js';
+import { notifyUser } from '../utils/notifyUser.js';
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -18,7 +18,10 @@ export const revokeProAccount = onCall(
     const callerOrgId = request.auth.token.organizationId as string | undefined;
 
     if (callerRole !== 'admin' && callerRole !== 'organization' && callerRole !== 'member') {
-      throw new HttpsError('permission-denied', 'Only admins and organization accounts can revoke Pro');
+      throw new HttpsError(
+        'permission-denied',
+        'Only admins and organization accounts can revoke Pro'
+      );
     }
 
     const { uid, organizationId } = request.data as { uid?: string; organizationId?: string };
@@ -28,7 +31,10 @@ export const revokeProAccount = onCall(
     if (!orgId) throw new HttpsError('invalid-argument', 'organizationId required');
 
     if ((callerRole === 'organization' || callerRole === 'member') && orgId !== callerOrgId) {
-      throw new HttpsError('permission-denied', 'You can only revoke users for your own organization');
+      throw new HttpsError(
+        'permission-denied',
+        'You can only revoke users for your own organization'
+      );
     }
 
     const db = admin.firestore();
@@ -39,7 +45,10 @@ export const revokeProAccount = onCall(
     const sponsoredBy: string[] = userData.sponsoredBy ?? [];
 
     if (!sponsoredBy.includes(orgId)) {
-      throw new HttpsError('failed-precondition', 'This user is not sponsored by your organization');
+      throw new HttpsError(
+        'failed-precondition',
+        'This user is not sponsored by your organization'
+      );
     }
 
     const remainingSponsors = sponsoredBy.filter((id) => id !== orgId);
@@ -57,7 +66,7 @@ export const revokeProAccount = onCall(
     if (orgUserSnap.exists) {
       const periods: any[] = orgUserSnap.data()!.periods ?? [];
       const updatedPeriods = periods.map((p: any) =>
-        p.endedAt === null ? { ...p, endedAt: now } : p,
+        p.endedAt === null ? { ...p, endedAt: now } : p
       );
       await orgUserRef.update({ periods: updatedPeriods, revokedAt: now, updatedAt: now });
     }
@@ -66,53 +75,44 @@ export const revokeProAccount = onCall(
 
     // Fetch the revoking org name + all remaining sponsor org names in parallel
     const orgIdsToFetch = [orgId, ...remainingSponsors];
-    const orgSnaps = await Promise.all(orgIdsToFetch.map((id) => db.doc(`organizations/${id}`).get()));
+    const [orgSnaps, authRecord] = await Promise.all([
+      Promise.all(orgIdsToFetch.map((id) => db.doc(`organizations/${id}`).get())),
+      admin.auth().getUser(uid),
+    ]);
     const orgNames = new Map(orgIdsToFetch.map((id, i) => [id, orgSnaps[i].data()?.name ?? id]));
 
     const revokedOrgName: string = orgNames.get(orgId) ?? orgId;
     const remainingOrgNames: string[] = remainingSponsors.map((id) => orgNames.get(id) ?? id);
     const stillCovered = remainingOrgNames.length > 0;
 
-    const userEmail: string = userData.email ?? '';
-    const displayName: string =
-      (userData.identities as Record<string, string> | undefined)?.[orgId] ??
-      userEmail ??
-      'there';
+    const userEmail: string = authRecord.email ?? '';
+    const displayName: string = authRecord.displayName || userEmail || 'there';
 
-    // Push notification (short — fits in banner)
+    // Push + in-app notification
     const deviceTokens: string[] = userData.deviceTokens ?? [];
-    if (deviceTokens.length > 0) {
-      const pushBody = stillCovered
-        ? `Still covered by ${remainingOrgNames[0]}${remainingOrgNames.length > 1 ? ` and ${remainingOrgNames.length - 1} other${remainingOrgNames.length > 2 ? 's' : ''}` : ''}`
-        : 'Open the app to get your own Pro subscription.';
+    const notifTitle = `${revokedOrgName} no longer sponsors your Pro`;
+    const notifBody = stillCovered
+      ? `Still covered by ${remainingOrgNames[0]}${remainingOrgNames.length > 1 ? ` and ${remainingOrgNames.length - 1} other${remainingOrgNames.length > 2 ? 's' : ''}` : ''}`
+      : 'Open the app to get your own Pro subscription.';
 
-      await sendExpoPushNotifications(
-        deviceTokens,
-        {
-          title: `${revokedOrgName} no longer sponsors your Pro`,
-          body: pushBody,
-        },
-        { type: 'pro_revoked', organizationId: orgId },
-      ).catch((e) => console.warn('[revokeProAccount] push failed:', e));
-    }
+    await notifyUser(admin.firestore(), uid, deviceTokens, notifTitle, notifBody, {
+      type: 'pro_revoked',
+      organizationId: orgId,
+    }).catch((e) => console.warn('[revokeProAccount] notification failed:', e));
 
     // Email notification
     if (userEmail) {
       try {
-        const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
-        const SENDER_EMAIL = 'vidopickhelp@gmail.com';
-        if (GMAIL_APP_PASSWORD) {
-          const nodemailer = await import('nodemailer');
+        const RESEND_API_KEY = process.env.RESEND_API_KEY;
+        if (RESEND_API_KEY) {
+          const { Resend } = await import('resend');
           const { buildProRevokedEmail } = await import('../utils/emailTemplates.js');
-          const transporter = nodemailer.default.createTransport({
-            service: 'gmail',
-            auth: { user: SENDER_EMAIL, pass: GMAIL_APP_PASSWORD },
-          });
+          const resend = new Resend(RESEND_API_KEY);
           const subject = stillCovered
             ? `A change to your Vidopick Pro membership`
             : `Your Vidopick Pro membership from ${revokedOrgName} has ended`;
-          await transporter.sendMail({
-            from: `"Vidopick" <${SENDER_EMAIL}>`,
+          await resend.emails.send({
+            from: 'Vidopick <hello@vidopick.com>',
             to: userEmail,
             subject,
             html: buildProRevokedEmail(displayName, revokedOrgName, remainingOrgNames),
@@ -125,5 +125,5 @@ export const revokeProAccount = onCall(
     }
 
     return { success: true };
-  },
+  }
 );

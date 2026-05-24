@@ -8,13 +8,23 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
+interface ProfileSnapshot {
+  uid: string;
+  profileId: string;
+  displayName: string;
+  color: string;
+  playlistIds: string[];
+}
+
 interface CreateInviteRequest {
-  name: string;               // Inviter name (e.g., "Candee Land")
+  name: string; // Inviter name (e.g., "Candee Land")
   organizationId?: string;
-  organizationName?: string;  // Stored in params so app doesn't need a Firestore fetch
+  organizationName?: string; // Stored in params so app doesn't need a Firestore fetch
   memberId?: string;
-  memberName?: string;        // Stored in params so app doesn't need a Firestore fetch
+  memberName?: string; // Stored in params so app doesn't need a Firestore fetch
   playlists?: string[];
+  profile?: { uid: string; profileId: string }; // profile to include in invite
+  requiresDisplayName?: boolean;
   slug?: string;
   ttl?: string;
   ogTitle?: string;
@@ -43,6 +53,8 @@ export const createInvite = onCall(async (request) => {
     memberId,
     memberName,
     playlists = [],
+    profile: profileRef,
+    requiresDisplayName,
     slug,
     ttl,
     ogTitle,
@@ -61,15 +73,21 @@ export const createInvite = onCall(async (request) => {
   const userMemberId = request.auth.token.memberId as string | undefined;
 
   if (!isAdmin && !isOrganization && !isMember) {
-    throw new HttpsError('permission-denied', 'Only admins, organizations, and members can create invites');
+    throw new HttpsError(
+      'permission-denied',
+      'Only admins, organizations, and members can create invites'
+    );
   }
 
   if ((isOrganization || isMember) && organizationId && organizationId !== userOrganizationId) {
-    throw new HttpsError('permission-denied', 'You can only create invites for your own organization');
+    throw new HttpsError(
+      'permission-denied',
+      'You can only create invites for your own organization'
+    );
   }
 
   // Auto-fill from token claims for org/member users
-  const finalOrganizationId = (!isAdmin && userOrganizationId) ? userOrganizationId : organizationId;
+  const finalOrganizationId = !isAdmin && userOrganizationId ? userOrganizationId : organizationId;
   const finalMemberId = isMember ? userMemberId : memberId;
 
   // Reserve ID (either custom slug or generate random)
@@ -114,6 +132,61 @@ export const createInvite = onCall(async (request) => {
     }
   }
 
+  // Validate + snapshot the profile included in the invite (if any)
+  let profileSnapshot: ProfileSnapshot | null = null;
+  let existingDisabledInviteId: string | null = null;
+  if (profileRef) {
+    const { uid: profileUid, profileId } = profileRef;
+    if (!isAdmin && profileUid !== request.auth.uid) {
+      throw new HttpsError('permission-denied', `You do not own profile ${profileId}`);
+    }
+    const profileSnap = await db.collection('profiles').doc(profileId).get();
+    if (!profileSnap.exists) {
+      throw new HttpsError('not-found', `Profile ${profileId} not found`);
+    }
+    const profileData = profileSnap.data()!;
+    if (profileData.inviteId) {
+      existingDisabledInviteId = profileData.inviteId as string;
+    }
+    profileSnapshot = {
+      uid: profileUid,
+      profileId,
+      displayName: profileData.name ?? 'Profile',
+      color: profileData.color ?? '#E53935',
+      playlistIds: profileData.playlistIds ?? [],
+    };
+  }
+
+  // Re-enable a previously disabled invite rather than creating a new one
+  if (existingDisabledInviteId && profileSnapshot) {
+    const existingDoc = await db.collection('shortLinks').doc(existingDisabledInviteId).get();
+    if (existingDoc.exists && existingDoc.data()?.disabled === true) {
+      await existingDoc.ref.update({ disabled: false });
+      const { profileId } = profileSnapshot;
+      const reEnableUpdates: Promise<any>[] = [
+        db.collection('profiles').doc(profileId).set({ isShared: true }, { merge: true }),
+      ];
+      if (finalMemberId) {
+        reEnableUpdates.push(
+          db
+            .collection('members')
+            .doc(finalMemberId)
+            .update({
+              sharedProfileIds: admin.firestore.FieldValue.arrayUnion(profileId),
+            })
+        );
+      }
+      await Promise.all(reEnableUpdates).catch((e) =>
+        console.warn('[createInvite] re-enable profile isShared failed:', e)
+      );
+      return {
+        success: true,
+        id: existingDisabledInviteId,
+        shortLink: `https://vpk.to/${existingDisabledInviteId}`,
+      };
+    }
+  }
+
   // Build invite document
   const inviteDoc = {
     linkTitle: `${name} invites you to try Vidopick`,
@@ -133,6 +206,8 @@ export const createInvite = onCall(async (request) => {
       ...(finalMemberId ? { memberId: finalMemberId } : {}),
       ...(memberName ? { memberName } : {}),
       ...(playlists && playlists.length > 0 ? { playlists } : {}),
+      ...(profileSnapshot ? { profile: profileSnapshot } : {}),
+      ...(requiresDisplayName ? { requiresDisplayName: true } : {}),
     },
     analytics: {},
     meta: {
@@ -145,6 +220,30 @@ export const createInvite = onCall(async (request) => {
 
   // Save to Firestore
   await db.collection('shortLinks').doc(id).set(inviteDoc);
+
+  // Mark shared profile as isShared=true and store the inviteId
+  if (profileSnapshot) {
+    const { profileId } = profileSnapshot;
+    const profileUpdates: Promise<any>[] = [
+      db
+        .collection('profiles')
+        .doc(profileId)
+        .set({ isShared: true, inviteId: id }, { merge: true }),
+    ];
+    if (finalMemberId) {
+      profileUpdates.push(
+        db
+          .collection('members')
+          .doc(finalMemberId)
+          .update({
+            sharedProfileIds: admin.firestore.FieldValue.arrayUnion(profileId),
+          })
+      );
+    }
+    await Promise.all(profileUpdates).catch((e) =>
+      console.warn('[createInvite] profile isShared update failed:', e)
+    );
+  }
 
   // Return the created invite
   return {
@@ -242,8 +341,33 @@ export const updateInvite = onCall(async (request) => {
     updateData['params.playlists'] = updates.playlists;
   }
 
+  if (updates.profile !== undefined) {
+    if (updates.profile === null) {
+      updateData['params.profile'] = admin.firestore.FieldValue.delete();
+    } else {
+      const { uid: profileUid, profileId } = updates.profile as { uid: string; profileId: string };
+      if (!isAdmin && profileUid !== request.auth.uid) {
+        throw new HttpsError('permission-denied', `You do not own profile ${profileId}`);
+      }
+      const profileSnap = await db.collection('profiles').doc(profileId).get();
+      if (!profileSnap.exists) throw new HttpsError('not-found', `Profile ${profileId} not found`);
+      const d = profileSnap.data()!;
+      updateData['params.profile'] = {
+        uid: profileUid,
+        profileId,
+        displayName: d.name ?? 'Profile',
+        color: d.color ?? '#E53935',
+        playlistIds: d.playlistIds ?? [],
+      };
+    }
+  }
+
   if (updates.ttl !== undefined) {
     updateData.ttl = updates.ttl ? new Date(updates.ttl) : null;
+  }
+
+  if (updates.requiresDisplayName !== undefined) {
+    updateData['params.requiresDisplayName'] = updates.requiresDisplayName || false;
   }
 
   if (updates.ogTitle !== undefined) {
@@ -268,7 +392,7 @@ export const updateInvite = onCall(async (request) => {
 });
 
 /**
- * Delete an invite
+ * Delete an invite (hard delete — use disableInvite to preserve analytics)
  */
 export const deleteInvite = onCall(async (request) => {
   if (!request.auth) {
@@ -281,7 +405,6 @@ export const deleteInvite = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'Invite ID is required');
   }
 
-  // Get the invite
   const inviteRef = db.collection('shortLinks').doc(id);
   const inviteSnap = await inviteRef.get();
 
@@ -290,31 +413,17 @@ export const deleteInvite = onCall(async (request) => {
   }
 
   const invite = inviteSnap.data();
-
-  // Check permissions
   const isAdmin = request.auth.token.role === 'admin';
+  let isOwner = invite?.createdBy === request.auth.uid;
 
-  let isOwner = false;
-
-  // Check if user owns this invite (either created it OR is the organization)
-  if (!isAdmin) {
-    // Check if they created it
-    if (invite?.createdBy === request.auth.uid) {
+  if (!isAdmin && !isOwner) {
+    const orgSnapshot = await db
+      .collection('organizations')
+      .where('authUid', '==', request.auth.uid)
+      .limit(1)
+      .get();
+    if (!orgSnapshot.empty && invite?.params?.organizationId === orgSnapshot.docs[0].id) {
       isOwner = true;
-    } else {
-      // Check if they're the organization
-      const orgSnapshot = await db
-        .collection('organizations')
-        .where('authUid', '==', request.auth.uid)
-        .limit(1)
-        .get();
-
-      if (!orgSnapshot.empty) {
-        const orgId = orgSnapshot.docs[0].id;
-        if (invite?.params?.organizationId === orgId) {
-          isOwner = true;
-        }
-      }
     }
   }
 
@@ -322,13 +431,112 @@ export const deleteInvite = onCall(async (request) => {
     throw new HttpsError('permission-denied', 'You can only delete your own invites');
   }
 
-  // Delete
-  await inviteRef.delete();
+  const cleanups: Promise<any>[] = [];
 
-  return {
-    success: true,
-    id,
-  };
+  // If this invite is linked to a shared profile, mark it as no longer shared
+  const profile = invite?.params?.profile;
+  if (profile?.uid && profile?.profileId) {
+    cleanups.push(
+      db
+        .collection('profiles')
+        .doc(profile.profileId)
+        .set({ isShared: false }, { merge: true })
+        .catch((e) => console.warn('[deleteInvite] profile isShared update failed:', e))
+    );
+  }
+
+  // Cancel pending profile follow requests for this invite
+  cleanups.push(
+    db
+      .collection('profileFollowRequests')
+      .where('inviteId', '==', id)
+      .where('status', '==', 'pending')
+      .get()
+      .then(async (snap) => {
+        if (snap.empty) return;
+        const batch = db.batch();
+        snap.docs.forEach((doc) => batch.update(doc.ref, { status: 'cancelled' }));
+        await batch.commit();
+        console.log(
+          `[deleteInvite] cancelled ${snap.size} pending profileFollowRequests for invite=${id}`
+        );
+      })
+      .catch((e) => console.warn('[deleteInvite] profileFollowRequests cleanup failed:', e))
+  );
+
+  // Cancel pending sponsorship requests for this invite
+  cleanups.push(
+    db
+      .collection('sponsorshipRequests')
+      .where('inviteId', '==', id)
+      .where('status', '==', 'pending')
+      .get()
+      .then(async (snap) => {
+        if (snap.empty) return;
+        const batch = db.batch();
+        snap.docs.forEach((doc) => batch.update(doc.ref, { status: 'cancelled' }));
+        await batch.commit();
+        console.log(
+          `[deleteInvite] cancelled ${snap.size} pending sponsorshipRequests for invite=${id}`
+        );
+      })
+      .catch((e) => console.warn('[deleteInvite] sponsorshipRequests cleanup failed:', e))
+  );
+
+  await Promise.all(cleanups);
+  await inviteRef.delete();
+  return { success: true, id };
+});
+
+/**
+ * Disable a profile share invite. Preserves the shortLinks record and analytics.
+ * The invite can be re-enabled by calling createInvite again for the same profile.
+ */
+export const disableInvite = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  const { id } = request.data;
+  if (!id) throw new HttpsError('invalid-argument', 'Invite ID is required');
+
+  const inviteRef = db.collection('shortLinks').doc(id);
+  const inviteSnap = await inviteRef.get();
+  if (!inviteSnap.exists) throw new HttpsError('not-found', 'Invite not found');
+
+  const invite = inviteSnap.data();
+  const isAdmin = request.auth.token.role === 'admin';
+  let isOwner = invite?.createdBy === request.auth.uid;
+
+  if (!isAdmin && !isOwner) {
+    const orgSnapshot = await db
+      .collection('organizations')
+      .where('authUid', '==', request.auth.uid)
+      .limit(1)
+      .get();
+    if (!orgSnapshot.empty && invite?.params?.organizationId === orgSnapshot.docs[0].id) {
+      isOwner = true;
+    }
+  }
+
+  if (!isAdmin && !isOwner) {
+    throw new HttpsError('permission-denied', 'You can only disable your own invites');
+  }
+
+  // Set disabled flag — keeps analytics intact
+  await inviteRef.update({ disabled: true });
+
+  // Mark any shared profile as no longer shared
+  const profile = invite?.params?.profile;
+  if (profile) {
+    await db
+      .collection('profiles')
+      .doc(profile.profileId)
+      .set({ isShared: false }, { merge: true })
+      .catch((e) => console.warn('[disableInvite] profile isShared update failed:', e));
+  }
+
+  return { success: true, id };
 });
 
 /**

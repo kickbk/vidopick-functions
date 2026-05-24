@@ -1,16 +1,19 @@
 import * as https from 'https';
 import * as admin from 'firebase-admin';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
-import * as nodemailer from 'nodemailer';
-import { buildInviteEmail, buildMemberInviteEmail, buildSignInEmail } from '../utils/emailTemplates';
+import { Resend } from 'resend';
+import {
+  buildInviteEmail,
+  buildMemberInviteEmail,
+  buildSignInEmail,
+} from '../utils/emailTemplates';
 
 if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY;
-const SENDER_EMAIL = 'vidopickhelp@gmail.com';
 
 function verifyTurnstile(token: string): Promise<boolean> {
   if (!TURNSTILE_SECRET_KEY) {
@@ -31,7 +34,9 @@ function verifyTurnstile(token: string): Promise<boolean> {
       },
       (res) => {
         let raw = '';
-        res.on('data', (chunk) => { raw += chunk; });
+        res.on('data', (chunk) => {
+          raw += chunk;
+        });
         res.on('end', () => {
           console.log(`[Turnstile] siteverify status=${res.statusCode} body=${raw}`);
           try {
@@ -62,13 +67,6 @@ function resolveAppUrl(appOrigin?: string): string {
   return 'https://vidopick.com';
 }
 
-function createTransporter() {
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: SENDER_EMAIL, pass: GMAIL_APP_PASSWORD },
-  });
-}
-
 /**
  * Admin-only: send or resend an invite email for an org account or a member account.
  *
@@ -83,14 +81,20 @@ export const sendOrganizationInvite = onCall(async (request) => {
   const callerOrgId = request.auth?.token.organizationId as string | undefined;
 
   if (!request.auth || (role !== 'admin' && role !== 'organization')) {
-    throw new HttpsError('permission-denied', 'Only admins and organization accounts can send invites');
+    throw new HttpsError(
+      'permission-denied',
+      'Only admins and organization accounts can send invites'
+    );
   }
 
   const { organizationId, memberId, appOrigin } = request.data;
 
   // Org accounts can only send invites for their own organization
   if (role === 'organization' && callerOrgId !== organizationId) {
-    throw new HttpsError('permission-denied', 'You can only send invites for your own organization');
+    throw new HttpsError(
+      'permission-denied',
+      'You can only send invites for your own organization'
+    );
   }
 
   const APP_URL = resolveAppUrl(appOrigin);
@@ -99,7 +103,7 @@ export const sendOrganizationInvite = onCall(async (request) => {
     throw new HttpsError('invalid-argument', 'organizationId is required');
   }
 
-  if (!GMAIL_APP_PASSWORD) {
+  if (!RESEND_API_KEY) {
     throw new HttpsError('internal', 'Email configuration missing');
   }
 
@@ -144,8 +148,9 @@ export const sendOrganizationInvite = onCall(async (request) => {
       handleCodeInApp: true,
     });
 
-    await createTransporter().sendMail({
-      from: `"Vidopick" <${SENDER_EMAIL}>`,
+    const resend = new Resend(RESEND_API_KEY);
+    await resend.emails.send({
+      from: 'Vidopick <hello@vidopick.com>',
       to: email,
       subject: `${orgName} invites you to Vidopick`,
       html: buildMemberInviteEmail(name, orgName, canApprovePro, signInLink),
@@ -183,8 +188,9 @@ export const sendOrganizationInvite = onCall(async (request) => {
     handleCodeInApp: true,
   });
 
-  await createTransporter().sendMail({
-    from: `"Vidopick" <${SENDER_EMAIL}>`,
+  const resend = new Resend(RESEND_API_KEY);
+  await resend.emails.send({
+    from: 'Vidopick <hello@vidopick.com>',
     to: email,
     subject: "You're invited to Vidopick",
     html: buildInviteEmail(name, signInLink),
@@ -216,22 +222,30 @@ export const sendSignInLink = onCall({ enforceAppCheck: true }, async (request) 
     throw new HttpsError('permission-denied', 'Verification failed. Please try again.');
   }
 
-  if (!GMAIL_APP_PASSWORD) {
+  if (!RESEND_API_KEY) {
     throw new HttpsError('internal', 'Email configuration missing');
   }
 
-  // Verify account exists — return success silently if not (prevent enumeration)
+  const ALLOWED_ROLES = ['admin', 'organization', 'member'];
+
+  let userRecord: admin.auth.UserRecord;
   try {
-    await admin.auth().getUserByEmail(email);
+    userRecord = await admin.auth().getUserByEmail(email);
   } catch (error: any) {
     if (error.code === 'auth/user-not-found') {
       console.log(`Sign-in link requested for unknown email: ${email}`);
-      return {
-        success: true,
-        message: 'If an account exists for this email, a sign-in link has been sent.',
-      };
+      throw new HttpsError(
+        'permission-denied',
+        'You do not have access to the Vidopick dashboard.'
+      );
     }
     throw new HttpsError('internal', `Auth lookup failed: ${error.message}`);
+  }
+
+  const role = userRecord.customClaims?.['role'] as string | undefined;
+  if (!role || !ALLOWED_ROLES.includes(role)) {
+    console.log(`Sign-in link requested for unauthorized user: ${email} (role: ${role ?? 'none'})`);
+    throw new HttpsError('permission-denied', 'You do not have access to the Vidopick dashboard.');
   }
 
   const continueUrl = `${APP_URL}/admin/auth/email-action/?email=${encodeURIComponent(email)}`;
@@ -240,8 +254,9 @@ export const sendSignInLink = onCall({ enforceAppCheck: true }, async (request) 
     handleCodeInApp: true,
   });
 
-  await createTransporter().sendMail({
-    from: `"Vidopick" <${SENDER_EMAIL}>`,
+  const resend = new Resend(RESEND_API_KEY);
+  await resend.emails.send({
+    from: 'Vidopick <hello@vidopick.com>',
     to: email,
     subject: 'Your Vidopick sign-in link',
     html: buildSignInEmail(signInLink),

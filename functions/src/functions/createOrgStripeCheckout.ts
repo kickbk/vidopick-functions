@@ -30,7 +30,10 @@ export const createOrgStripeCheckout = onCall(
     const callerOrgId = request.auth.token.organizationId as string | undefined;
 
     if (callerRole !== 'admin' && callerRole !== 'organization') {
-      throw new HttpsError('permission-denied', 'Only admins and organization accounts can set up billing');
+      throw new HttpsError(
+        'permission-denied',
+        'Only admins and organization accounts can set up billing'
+      );
     }
 
     const { organizationId } = request.data as { organizationId?: string };
@@ -38,7 +41,10 @@ export const createOrgStripeCheckout = onCall(
     if (!orgId) throw new HttpsError('invalid-argument', 'organizationId required');
 
     if (callerRole === 'organization' && orgId !== callerOrgId) {
-      throw new HttpsError('permission-denied', 'You can only set up billing for your own organization');
+      throw new HttpsError(
+        'permission-denied',
+        'You can only set up billing for your own organization'
+      );
     }
 
     const db = admin.firestore();
@@ -56,7 +62,10 @@ export const createOrgStripeCheckout = onCall(
       const authUid: string | undefined = orgData.authUid;
       let email: string | undefined;
       if (authUid) {
-        const orgUser = await admin.auth().getUser(authUid).catch(() => null);
+        const orgUser = await admin
+          .auth()
+          .getUser(authUid)
+          .catch(() => null);
         email = orgUser?.email;
       }
       const customer = await stripe.customers.create({
@@ -84,7 +93,8 @@ export const createOrgStripeCheckout = onCall(
       },
       custom_text: {
         submit: {
-          message: 'Your card will be charged monthly for your management fee and active sponsored users.',
+          message:
+            'Your card will be charged monthly for your management fee and active sponsored users.',
         },
       },
     });

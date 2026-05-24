@@ -57,10 +57,7 @@ export const savePlaylistFromExtension = onRequest(
         ? { ...existingData, ...playlistData, isApproved: true }
         : { ...playlistData, isApproved: true };
 
-      await db
-        .collection('scannedPlaylists')
-        .doc(playlistId)
-        .set(dataToSave, { merge: true });
+      await db.collection('scannedPlaylists').doc(playlistId).set(dataToSave, { merge: true });
 
       console.log(`[savePlaylistFromExtension] saved ${playlistId} (promoted=${!!existingData})`);
       response.status(200).json({ success: true, id: playlistId });

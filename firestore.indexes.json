@@ -15,12 +15,60 @@
         { "fieldPath": "createdBy", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "users",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "pendingApprovalFrom", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "members",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "organizationId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "profileFollowRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "memberId", "order": "ASCENDING" },
+        { "fieldPath": "profileId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "profileFollowRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "profileOwnerUid", "order": "ASCENDING" },
+        { "fieldPath": "profileId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "sponsorshipRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "memberId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "deviceSessions",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
       "collectionGroup": "shortLinks",
-      "fieldPath": "params.advertiserId",
+      "fieldPath": "params.organizationId",
       "indexes": [
         { "order": "ASCENDING", "queryScope": "COLLECTION" },
         { "order": "DESCENDING", "queryScope": "COLLECTION" }

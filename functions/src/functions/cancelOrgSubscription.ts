@@ -27,7 +27,10 @@ export const cancelOrgSubscription = onCall(
     if (!orgId) throw new HttpsError('invalid-argument', 'organizationId required');
 
     if (callerRole === 'organization' && orgId !== callerOrgId) {
-      throw new HttpsError('permission-denied', 'You can only cancel billing for your own organization');
+      throw new HttpsError(
+        'permission-denied',
+        'You can only cancel billing for your own organization'
+      );
     }
 
     const db = admin.firestore();

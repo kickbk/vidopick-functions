@@ -65,9 +65,9 @@ export async function resetDemoSession(): Promise<void> {
       saves: 284,
       clicks: 198,
       platformStats: {
-        ios:     { impressions: 1920, skips: 1480, saves: 142, clicks: 98 },
+        ios: { impressions: 1920, skips: 1480, saves: 142, clicks: 98 },
         android: { impressions: 1540, skips: 1190, saves: 114, clicks: 78 },
-        tv:      { impressions:  387, skips:  291, saves:  28, clicks: 22 },
+        tv: { impressions: 387, skips: 291, saves: 28, clicks: 22 },
       },
     });
   }
@@ -79,12 +79,14 @@ export async function resetDemoSession(): Promise<void> {
     batch.update(inviteRef, {
       'params.organizationId': DEMO_ORGANIZATION_ID,
       analytics: {
-        clicks:      { total: 412, byPlatform: { ios: 218, android: 143, tv: 51 } },
-        conversions: { total: 87,  byPlatform: { ios: 46,  android: 31,  tv: 10 } },
+        clicks: { total: 412, byPlatform: { ios: 218, android: 143, tv: 51 } },
+        conversions: { total: 87, byPlatform: { ios: 46, android: 31, tv: 10 } },
       },
     });
   }
 
   await batch.commit();
-  console.log(`demoReset: session released and stats reset for organization ${DEMO_ORGANIZATION_ID}`);
+  console.log(
+    `demoReset: session released and stats reset for organization ${DEMO_ORGANIZATION_ID}`
+  );
 }

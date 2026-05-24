@@ -44,12 +44,16 @@ export const cancelStripeSubscription = onCall(
     await stripe.subscriptions.update(subscriptionId, { cancel_at_period_end: true });
 
     // Optimistic local update — webhook will fire the definitive status change
-    await db.doc(`users/${uid}`).set(
-      { proStatus: 'none', stripeCancelledAt: admin.firestore.FieldValue.serverTimestamp() },
-      { merge: true }
-    );
+    await db
+      .doc(`users/${uid}`)
+      .set(
+        { proStatus: 'none', stripeCancelledAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true }
+      );
 
-    console.log(`[cancelStripeSubscription] uid=${uid} sub=${subscriptionId} cancel_at_period_end=true`);
+    console.log(
+      `[cancelStripeSubscription] uid=${uid} sub=${subscriptionId} cancel_at_period_end=true`
+    );
 
     return { success: true };
   }

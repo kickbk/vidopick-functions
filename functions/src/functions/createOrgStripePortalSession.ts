@@ -29,7 +29,10 @@ export const createOrgStripePortalSession = onCall(
     const callerOrgId = request.auth.token.organizationId as string | undefined;
 
     if (callerRole !== 'admin' && callerRole !== 'organization') {
-      throw new HttpsError('permission-denied', 'Only admins and organization accounts can access billing');
+      throw new HttpsError(
+        'permission-denied',
+        'Only admins and organization accounts can access billing'
+      );
     }
 
     const { organizationId } = request.data as { organizationId?: string };
@@ -37,7 +40,10 @@ export const createOrgStripePortalSession = onCall(
     if (!orgId) throw new HttpsError('invalid-argument', 'organizationId required');
 
     if (callerRole === 'organization' && orgId !== callerOrgId) {
-      throw new HttpsError('permission-denied', 'You can only manage billing for your own organization');
+      throw new HttpsError(
+        'permission-denied',
+        'You can only manage billing for your own organization'
+      );
     }
 
     const db = admin.firestore();
@@ -45,7 +51,8 @@ export const createOrgStripePortalSession = onCall(
     if (!orgSnap.exists) throw new HttpsError('not-found', 'Organization not found');
 
     const customerId: string | undefined = orgSnap.data()!.stripeCustomerId;
-    if (!customerId) throw new HttpsError('failed-precondition', 'No Stripe account set up for this organization');
+    if (!customerId)
+      throw new HttpsError('failed-precondition', 'No Stripe account set up for this organization');
 
     const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2026-03-25.dahlia' });
 

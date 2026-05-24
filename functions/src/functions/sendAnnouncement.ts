@@ -24,10 +24,18 @@ export const sendAnnouncement = onCall(
     const callerOrgId = request.auth.token.organizationId as string | undefined;
 
     if (callerRole !== 'admin' && callerRole !== 'organization' && callerRole !== 'member') {
-      throw new HttpsError('permission-denied', 'Only admins and organization accounts can send announcements');
+      throw new HttpsError(
+        'permission-denied',
+        'Only admins and organization accounts can send announcements'
+      );
     }
 
-    const { organizationId, title, body, target = 'active' } = (request.data ?? {}) as {
+    const {
+      organizationId,
+      title,
+      body,
+      target = 'active',
+    } = (request.data ?? {}) as {
       organizationId?: string;
       title?: string;
       body?: string;
@@ -43,24 +51,21 @@ export const sendAnnouncement = onCall(
       (callerRole === 'organization' || callerRole === 'member') &&
       callerOrgId !== organizationId
     ) {
-      throw new HttpsError('permission-denied', 'You can only send announcements for your own organization');
+      throw new HttpsError(
+        'permission-denied',
+        'You can only send announcements for your own organization'
+      );
     }
 
     const db = admin.firestore();
 
     // Build query for target users
-    let usersQuery = db.collection('users').where(
-      'sponsoredBy',
-      'array-contains',
-      organizationId
-    );
+    let usersQuery = db.collection('users').where('sponsoredBy', 'array-contains', organizationId);
 
     if (target === 'pending') {
-      usersQuery = db.collection('users').where(
-        'pendingApprovalFrom',
-        'array-contains',
-        organizationId
-      ) as typeof usersQuery;
+      usersQuery = db
+        .collection('users')
+        .where('pendingApprovalFrom', 'array-contains', organizationId) as typeof usersQuery;
     }
 
     const snap = await usersQuery.get();
@@ -83,8 +88,32 @@ export const sendAnnouncement = onCall(
     await sendExpoPushNotifications(
       allTokens,
       { title: title.trim(), body: body.trim() },
-      { type: 'announcement', organizationId },
+      { type: 'announcement', organizationId }
     );
+
+    // Persist notification to each user's notifications subcollection
+    const sentAt = admin.firestore.FieldValue.serverTimestamp();
+    const notifPayload = {
+      title: title.trim(),
+      body: body.trim(),
+      sentAt,
+      viewedAt: null,
+      type: 'announcement',
+      organizationId,
+    };
+    let batch = db.batch();
+    let opCount = 0;
+    for (const userDoc of snap.docs) {
+      const notifRef = db.collection('users').doc(userDoc.id).collection('notifications').doc();
+      batch.set(notifRef, notifPayload);
+      opCount++;
+      if (opCount >= 499) {
+        await batch.commit();
+        batch = db.batch();
+        opCount = 0;
+      }
+    }
+    if (opCount > 0) await batch.commit();
 
     console.log(
       `[sendAnnouncement] org=${organizationId} title="${title}" tokens=${allTokens.length}`

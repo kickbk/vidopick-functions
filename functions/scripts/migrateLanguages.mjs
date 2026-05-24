@@ -240,35 +240,45 @@ async function migrateLanguages(options = {}) {
 }
 
 /**
- * Fetch video titles from YouTube XML feed
+ * Fetch video titles and first video description from YouTube XML feed
  */
-async function fetchVideoTitles(playlistId) {
+async function fetchPlaylistData(playlistId) {
   try {
     const response = await axios.get(
       `https://www.youtube.com/feeds/videos.xml?playlist_id=${playlistId}`
     );
+    const xml = response.data;
+
     const titles = [];
-    for (const match of response.data.matchAll(/<media:title>(.*?)<\/media:title>/g)) {
+    for (const match of xml.matchAll(/<media:title>(.*?)<\/media:title>/g)) {
       titles.push(match[1]);
     }
-    return titles.slice(0, 10);
+
+    const descMatch = xml.match(/<media:description>([\s\S]*?)<\/media:description>/);
+    const firstVideoDescription = descMatch
+      ? descMatch[1].replace(/https?:\/\/\S+/g, '').replace(/\s{2,}/g, ' ').trim().slice(0, 400)
+      : '';
+
+    return { titles: titles.slice(0, 10), firstVideoDescription };
   } catch {
-    return [];
+    return { titles: [], firstVideoDescription: '' };
   }
 }
 
 /**
- * Ask OpenAI for the languages array for a playlist
+ * Ask OpenAI for the languages array for a playlist.
+ * Uses video titles only — descriptions are excluded because they often contain
+ * marketing boilerplate with country-coded links that mislead language detection.
  */
-async function fetchLanguagesFromAI(playlistId, playlistTitle, videoTitles) {
+async function fetchLanguagesFromAI(playlistTitle, videoTitles) {
   if (!openai) throw new Error('OPENAI_API_KEY not set in .env');
 
-  const prompt = `A YouTube playlist titled "${playlistTitle}" contains these videos:\n${videoTitles.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\nRespond with ONLY a JSON object:\n{"languages": ["English"]}\n\nIMPORTANT: Always return an array of the actual languages spoken in the videos. Never use "Multiple" — list each language: ["English", "Spanish"], ["Hebrew"], etc.`;
+  const prompt = `A YouTube playlist titled "${playlistTitle}" contains these videos:\n${videoTitles.map((t, i) => `${i + 1}. ${t}`).join('\n')}\n\nRespond with ONLY a JSON object:\n{"languages": ["<detected language>"]}\n\nIMPORTANT: Detect the spoken language from the video titles only. Rules:\n1. Explicit labels like "English Song", "Spanish Version" in a title are definitive for that content.\n2. If the majority of titles share a language label or are in the same language, use that — do not add a second language from SEO keywords appended to one title (e.g. "| de pompier, voiture de" at the end of an otherwise English title).\n3. Non-English words that are the main part of titles (not appended SEO tags) are a strong signal.\n4. Never use "Multiple" — list the actual language names: ["Italian"], ["Spanish"], ["English"], etc.`;
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
-      { role: 'system', content: 'You detect the spoken language(s) of YouTube videos based on their titles. Return only a JSON object.' },
+      { role: 'system', content: 'You detect the spoken language of YouTube videos from their titles. Return only a JSON object.' },
       { role: 'user', content: prompt },
     ],
     temperature: 0.2,
@@ -317,14 +327,14 @@ async function fixReviews(options = {}) {
     console.log(`   old language: "${playlist.language || '(none)'}"`);
 
     try {
-      const titles = await fetchVideoTitles(playlist.docId);
+      const { titles, firstVideoDescription } = await fetchPlaylistData(playlist.docId);
       if (titles.length === 0) {
         console.log('   ⚠️  No video titles found — skipping');
         failed++;
         continue;
       }
 
-      const languages = await fetchLanguagesFromAI(playlist.docId, playlist.title, titles);
+      const languages = await fetchLanguagesFromAI(playlist.title, titles, firstVideoDescription);
       console.log(`   languages (new): ${JSON.stringify(languages)}`);
 
       if (!dryRun) {
@@ -355,6 +365,107 @@ async function fixReviews(options = {}) {
   console.log('='.repeat(60));
 }
 
+/**
+ * Re-check and update the languages field for playlists by fetching fresh
+ * data from YouTube (including first-video description) and re-running AI.
+ *
+ * Usage:
+ *   node scripts/migrateLanguages.mjs --recheck --id <playlistId>   # single playlist
+ *   node scripts/migrateLanguages.mjs --recheck                     # all playlists
+ *   node scripts/migrateLanguages.mjs --recheck --dryRun            # preview only
+ *   node scripts/migrateLanguages.mjs --recheck --maxRecords 20     # limit batch
+ *   node scripts/migrateLanguages.mjs --recheck --all               # include unapproved
+ *   node scripts/migrateLanguages.mjs --recheck --delayMs 1000      # custom rate limit
+ */
+async function recheckLanguages(options = {}) {
+  const { dryRun = false, maxRecords = Infinity, skip = 0, all = false, id = null, delayMs = 600 } = options;
+
+  console.log('🔍 Re-checking playlist languages with fresh YouTube data...');
+  if (dryRun) console.log('🔍 DRY RUN — no changes will be written\n');
+
+  if (!openai) {
+    console.error('❌ OPENAI_API_KEY is not set in .env — cannot call AI');
+    process.exit(1);
+  }
+
+  let playlists;
+
+  if (id) {
+    const doc = await db.collection(COLLECTION_NAME).doc(id).get();
+    if (!doc.exists) {
+      console.error(`❌ No record found with id "${id}"`);
+      return;
+    }
+    playlists = [{ docId: doc.id, ...doc.data() }];
+    console.log(`🎯 Targeting single playlist: ${playlists[0].title || id}\n`);
+  } else {
+    let query = db.collection(COLLECTION_NAME);
+    if (!all) query = query.where('isApproved', '==', true);
+    const snapshot = await query.get();
+    playlists = snapshot.docs.map((doc) => ({ docId: doc.id, ...doc.data() }));
+    console.log(`📊 Found ${playlists.length} playlist(s) (${all ? 'all' : 'approved only'})\n`);
+  }
+
+  const toProcess = playlists.slice(skip, maxRecords < Infinity ? skip + maxRecords : undefined);
+  if (skip > 0) console.log(`⏭  Skipping first ${skip} record(s)\n`);
+  let updated = 0;
+  let unchanged = 0;
+  let failed = 0;
+
+  for (let i = 0; i < toProcess.length; i++) {
+    const playlist = toProcess[i];
+    const current = Array.isArray(playlist.languages)
+      ? playlist.languages
+      : [playlist.language || 'unknown'];
+
+    console.log(`\n[${i + 1}/${toProcess.length}] ${playlist.title || playlist.docId}`);
+    console.log(`   current: ${JSON.stringify(current)}`);
+
+    try {
+      const { titles, firstVideoDescription } = await fetchPlaylistData(playlist.docId);
+      if (titles.length === 0) {
+        console.log('   ⚠️  No video titles from YouTube — skipping');
+        failed++;
+        continue;
+      }
+
+      const languages = await fetchLanguagesFromAI(playlist.title, titles, firstVideoDescription);
+      console.log(`   proposed: ${JSON.stringify(languages)}`);
+
+      const changed = JSON.stringify(current.slice().sort()) !== JSON.stringify(languages.slice().sort());
+      if (!changed) {
+        console.log('   ✅ No change');
+        unchanged++;
+      } else {
+        console.log(`   ✏️  Will update`);
+        if (!dryRun) {
+          await db.collection(COLLECTION_NAME).doc(playlist.docId).update({
+            languages,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+        updated++;
+      }
+    } catch (err) {
+      console.error(`   ❌ Failed: ${err.message}`);
+      failed++;
+    }
+
+    if (i < toProcess.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+
+  console.log('\n' + '='.repeat(60));
+  console.log('📊 RECHECK COMPLETE');
+  console.log('='.repeat(60));
+  console.log(`✏️  Updated:   ${updated}`);
+  console.log(`✅ Unchanged: ${unchanged}`);
+  if (failed > 0) console.log(`❌ Failed:    ${failed}`);
+  if (dryRun) console.log('\n💡 Run without --dryRun to apply changes');
+  console.log('='.repeat(60));
+}
+
 // CLI — strip any bare `--` separators before parseArgs sees them
 // (npm run script -- --flag passes a leading `--` which parseArgs treats
 //  as "end of options", causing everything after it to be ignored)
@@ -364,23 +475,33 @@ const { values } = parseArgs({
   args: filteredArgs,
   options: {
     dryRun:      { type: 'boolean', default: false },
-    maxRecords:  { type: 'string',  default: '0'    }, // 0 = unlimited
-    all:         { type: 'boolean', default: false  },
-    id:          { type: 'string',  default: ''     },
-    fixReviews:  { type: 'boolean', default: false  },
+    maxRecords:  { type: 'string',  default: '0'   }, // 0 = unlimited
+    skip:        { type: 'string',  default: '0'   }, // skip first N records
+    all:         { type: 'boolean', default: false },
+    id:          { type: 'string',  default: ''    },
+    fixReviews:  { type: 'boolean', default: false },
+    recheck:     { type: 'boolean', default: false },
+    delayMs:     { type: 'string',  default: '600' }, // ms between AI calls
   },
-  strict: false,
+  strict: true,
 });
 
 const maxRecords = parseInt(values.maxRecords, 10);
-const task = values.fixReviews
-  ? fixReviews({ dryRun: values.dryRun })
-  : migrateLanguages({
-      dryRun:     values.dryRun,
-      maxRecords: maxRecords > 0 ? maxRecords : Infinity,
-      all:        values.all,
-      id:         values.id || null,
-    });
+const skip = parseInt(values.skip, 10);
+const delayMs = parseInt(values.delayMs, 10);
+const sharedOpts = {
+  dryRun:     values.dryRun,
+  maxRecords: maxRecords > 0 ? maxRecords : Infinity,
+  skip:       skip > 0 ? skip : 0,
+  all:        values.all,
+  id:         values.id || null,
+};
+
+const task = values.recheck
+  ? recheckLanguages({ ...sharedOpts, delayMs })
+  : values.fixReviews
+    ? fixReviews({ dryRun: values.dryRun })
+    : migrateLanguages(sharedOpts);
 
 task
   .then(() => {

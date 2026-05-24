@@ -28,7 +28,11 @@ export const createStripeCheckoutSession = onCall(
     }
 
     const uid = request.auth.uid;
-    const { successUrl, cancelUrl, interval = 'month' } = (request.data ?? {}) as {
+    const {
+      successUrl,
+      cancelUrl,
+      interval = 'month',
+    } = (request.data ?? {}) as {
       successUrl?: string;
       cancelUrl?: string;
       interval?: 'month' | 'year';

@@ -24,7 +24,7 @@ export const releaseDemoSession = onCall(async (request) => {
   const isAdmin = request.auth.token.role === 'admin';
   const isDemo =
     request.auth.token.organizationId === DEMO_ORGANIZATION_ID ||
-    request.auth.token.email?.toLowerCase() === 'vidopick@gmail.com';
+    request.auth.token.email?.toLowerCase() === 'demo@vidopick.com';
 
   if (!isAdmin && !isDemo) {
     throw new HttpsError('permission-denied', 'Not authorized to release demo session');
@@ -42,7 +42,9 @@ export const releaseDemoSession = onCall(async (request) => {
       // Only revoke when the demo user themselves sign out (admin doesn't need this)
       await admin.auth().revokeRefreshTokens(authUid);
     }
-    console.log(`Demo session released by ${isAdmin ? 'admin' : 'demo user'} (${request.auth.uid})`);
+    console.log(
+      `Demo session released by ${isAdmin ? 'admin' : 'demo user'} (${request.auth.uid})`
+    );
   } catch (error: any) {
     console.warn('Failed to revoke demo tokens:', error.message);
   }

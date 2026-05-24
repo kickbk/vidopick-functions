@@ -67,9 +67,10 @@ export const compressUploadedImage = onObjectFinalized(
       const metadata = await imageInstance.metadata();
 
       // Detect if the original is portrait
-      // We check metadata.orientation because some cameras store portrait images 
+      // We check metadata.orientation because some cameras store portrait images
       // as landscape with a rotation flag. .rotate() handles this later.
-      const isPortrait = metadata.height && metadata.width ? metadata.height > metadata.width : false;
+      const isPortrait =
+        metadata.height && metadata.width ? metadata.height > metadata.width : false;
 
       // Swap dimensions if portrait to maintain the intended aspect ratio
       let finalWidth = targetWidth;

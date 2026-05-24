@@ -1,0 +1,292 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.role == 'admin';
+    }
+
+    function isOrgAccount(organizationId) {
+      return isSignedIn()
+        && request.auth.token.role == 'organization'
+        && request.auth.token.organizationId == organizationId;
+    }
+
+    function isMember(organizationId) {
+      return isSignedIn()
+        && request.auth.token.role == 'member'
+        && request.auth.token.organizationId == organizationId;
+    }
+
+    function isOrgOrMember(organizationId) {
+      return isOrgAccount(organizationId) || isMember(organizationId);
+    }
+
+    function ownsDoc(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ── users ─────────────────────────────────────────────────────────────────
+
+    match /users/{uid} {
+      // Users can read and write their own document
+      allow read, write: if ownsDoc(uid);
+
+      // Admins can read all user documents
+      allow read: if isAdmin();
+
+      // Org accounts and members can read their sponsored users
+      // (needed for org dashboard Pro counts and legacy data access)
+      allow read: if isSignedIn()
+        && (request.auth.token.role == 'organization' || request.auth.token.role == 'member')
+        && resource.data.sponsoredBy is list
+        && resource.data.sponsoredBy.hasAny([request.auth.token.organizationId]);
+
+      // Cloud Functions (admin SDK) bypass these rules entirely
+
+      // ── profiles subcollection ──────────────────────────────────────────────
+      match /profiles/{profileId} {
+        allow read, write: if ownsDoc(uid);
+        allow read: if isSignedIn() && resource.data.isShared == true;
+        allow read: if isAdmin();
+
+        match /watchHistory/{date} {
+          allow read, write: if ownsDoc(uid);
+        }
+      }
+
+      // ── notifications subcollection ─────────────────────────────────────────
+      // Written by Cloud Functions only. Client may read and mark as viewed.
+      match /notifications/{notifId} {
+        allow read: if ownsDoc(uid);
+        allow update: if ownsDoc(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedAt']);
+        allow create, delete: if false;
+      }
+
+      // ── following subcollection (LEGACY — kept for old client versions) ───────
+      // Each doc: { profileId, sourceUid, organizationId?, memberId?, inviteId, createdAt }
+      // New clients no longer write here; Cloud Functions still manage it during migration.
+      match /following/{followId} {
+        allow read: if ownsDoc(uid);
+        allow write: if false; // CF only
+
+        allow update: if ownsDoc(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dailyLimitMinutes', 'skipShufflePlaylistIds']);
+
+        match /watchHistory/{date} {
+          allow read, write: if ownsDoc(uid);
+        }
+      }
+
+      // ── watchHistory subcollection (NEW) ─────────────────────────────────────
+      // Single doc per profileId (owned or followed), keyed by date string.
+      // Shape: { "2026-05-21": { seconds: 720, isLimitOverridden?: false }, ... }
+      match /watchHistory/{profileId} {
+        allow read, write: if ownsDoc(uid);
+      }
+    }
+
+    // ── profiles (root collection, NEW) ──────────────────────────────────────
+    // Canonical profile docs for all owned and followed profiles.
+    // Shape: { uid, name, color, playlistIds, isShared, followerUids, ... }
+
+    match /profiles/{profileId} {
+      // Owner has full access (uid field identifies the owner)
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+
+      // Followers can read profiles they follow
+      // (followerUids is managed by Cloud Functions via arrayUnion/arrayRemove)
+      allow read: if isSignedIn()
+        && resource.data.followerUids is list
+        && request.auth.uid in resource.data.followerUids;
+
+      // Anyone signed in can read publicly shared profiles
+      // (profileId is learned via invite link — obscurity provides a baseline gate)
+      allow read: if isSignedIn() && resource.data.isShared == true;
+
+      allow read: if isAdmin();
+    }
+
+    // ── sponsorshipRequests ───────────────────────────────────────────────────
+    // Created when user scans an org invite. Org approves/declines. CF-only writes for approve/decline.
+
+    match /sponsorshipRequests/{requestId} {
+      allow read: if isSignedIn() && resource.data.requestingUid == request.auth.uid;
+      allow read: if isSignedIn()
+        && request.auth.token.role == 'organization'
+        && resource.data.organizationId == request.auth.token.organizationId;
+      allow read: if isSignedIn()
+        && request.auth.token.role == 'member'
+        && resource.data.memberId == request.auth.token.memberId;
+      allow read: if isAdmin();
+
+      allow create: if isSignedIn()
+        && request.resource.data.requestingUid == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      allow update: if isSignedIn()
+        && resource.data.requestingUid == request.auth.uid
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+    }
+
+    // ── profileFollowRequests ─────────────────────────────────────────────────
+    // Top-level collection; queries scoped by organizationId, memberId, or requestingUid.
+
+    match /profileFollowRequests/{requestId} {
+      // The requesting user can read their own requests
+      allow read: if isSignedIn() && resource.data.requestingUid == request.auth.uid;
+
+      // Org accounts can read all requests for their organization
+      allow read: if isSignedIn()
+        && request.auth.token.role == 'organization'
+        && resource.data.organizationId == request.auth.token.organizationId;
+
+      // Members can read requests scoped to their memberId (for their own profiles' follow requests)
+      // request.auth.token.memberId is set by the setMemberClaims Cloud Function
+      allow read: if isSignedIn()
+        && request.auth.token.role == 'member'
+        && resource.data.memberId == request.auth.token.memberId;
+
+      // Members can also read all org-level requests when they have org-wide approve access
+      // (the memberId filter is applied client-side in ParentApprovalList)
+      allow read: if isSignedIn()
+        && request.auth.token.role == 'member'
+        && resource.data.organizationId == request.auth.token.organizationId;
+
+      // Profile owners can read follow requests for their own profiles
+      // (used by ProfileManagement to show follower/pending counts)
+      allow read: if isSignedIn() && resource.data.profileOwnerUid == request.auth.uid;
+
+      // Admins can read all
+      allow read: if isAdmin();
+
+      // Authenticated users can create a follow request for themselves
+      allow create: if isSignedIn()
+        && request.resource.data.requestingUid == request.auth.uid
+        && request.resource.data.status == 'pending';
+
+      // Only the requesting user can cancel (set status to 'cancelled')
+      allow update: if isSignedIn()
+        && resource.data.requestingUid == request.auth.uid
+        && request.resource.data.status == 'cancelled'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+
+      // All other status transitions (approve, decline, revoke) are Cloud Functions only
+    }
+
+    // ── organizations ─────────────────────────────────────────────────────────
+
+    match /organizations/{organizationId} {
+      allow read: if true; // public — org name/logo/isActive needed for ad serving in mobile app
+      allow write: if isAdmin();
+      // Org accounts can update their own document (Edit Profile, settings, etc.)
+      // but cannot create or delete — those are admin-only operations
+      allow update: if isOrgAccount(organizationId);
+    }
+
+    // ── members ───────────────────────────────────────────────────────────────
+
+    match /members/{memberId} {
+      allow read: if isAdmin()
+        || isOrgAccount(resource.data.organizationId)
+        || (isSignedIn() && request.auth.uid == resource.data.authUid);
+
+      // Members can write their own authUid field (written by EmailSignInAction after sign-in).
+      // Also allows re-writing the same uid (idempotent) so resent invite links still work.
+      allow update: if isSignedIn()
+        && request.auth.uid == request.resource.data.authUid
+        && (resource.data.authUid == null || resource.data.authUid == request.auth.uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authUid']);
+
+      allow create: if isAdmin()
+        || (isOrgAccount(request.resource.data.organizationId));
+      allow delete: if isAdmin();
+      allow update: if isAdmin() || isOrgAccount(resource.data.organizationId);
+    }
+
+    // ── ads (subcollection under organizations) ───────────────────────────────
+
+    match /organizations/{organizationId}/ads/{adId} {
+      allow read: if true;
+      allow write: if isAdmin() || isOrgAccount(organizationId);
+    }
+
+    // Required for collectionGroup('ads') queries used by admin dashboard
+    match /{path=**}/ads/{adId} {
+      allow read: if true;
+    }
+
+    // ── shortLinks ────────────────────────────────────────────────────────────
+
+    match /shortLinks/{linkId} {
+      allow read: if true;
+      allow write: if isAdmin() || isOrgOrMember(resource.data.params.organizationId);
+    }
+
+    // ── invites (shortLinks sub-documents) ────────────────────────────────────
+
+    match /invites/{inviteId} {
+      allow read: if true;
+      allow write: if isAdmin() || isOrgOrMember(resource.data.organizationId);
+    }
+
+    // ── deviceSessions ────────────────────────────────────────────────────────
+
+    match /deviceSessions/{sessionId} {
+      // Device reads its own session while unauthenticated — the random sessionId is the secret.
+      // Writes are cloud-function only (admin SDK bypasses rules).
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ── scannedPlaylists (import tracking) ───────────────────────────────────
+
+    match /scannedPlaylists/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // ── playlistIdIndex ───────────────────────────────────────────────────────
+
+    match /playlistIdIndex/{docId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // ── orgSponsors (billing / sponsorship tracking) ─────────────────────────
+    // orgSponsors/{orgId}/users/{uid}
+
+    match /orgSponsors/{organizationId}/users/{uid} {
+      allow read: if isAdmin()
+        || isOrgAccount(organizationId)
+        || isMember(organizationId);
+      // Writes are admin-SDK only (cloud functions)
+      allow write: if false;
+    }
+
+    // ── leads (Sam CRM) ───────────────────────────────────────────────────────
+    // Sam app writes via anonymous auth. Web admin reads/writes/deletes via admin role.
+
+    match /leads/{leadId} {
+      allow read, create, update: if request.auth.uid == 'poPjm1Ngw9aKnzcB6HwZSkewB392' || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ── Deny everything else ──────────────────────────────────────────────────
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

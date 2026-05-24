@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { buildDemoAccessEmail } from '../utils/emailTemplates';
 import { sendDemoNotification } from '../utils/sendDemoNotification';
 
@@ -8,10 +8,9 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
-const SENDER_EMAIL = 'vidopickhelp@gmail.com';
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const DEMO_ORGANIZATION_ID = process.env.DEMO_ORGANIZATION_ID;
-const DEMO_EMAIL = 'vidopick@gmail.com';
+const DEMO_EMAIL = 'demo@vidopick.com';
 
 const ALLOWED_ORIGINS = ['https://vidopick.com', 'http://localhost:5173'];
 
@@ -24,7 +23,7 @@ function resolveAppUrl(appOrigin?: string): string {
  * Public (no auth required): check demo session availability, then send a
  * magic sign-in link for the demo account to the requester's own email.
  *
- * The sign-in link authenticates as the demo Firebase account (vidopick@gmail.com),
+ * The sign-in link authenticates as the demo Firebase account (demo@vidopick.com),
  * but is emailed to the recipient so it never goes to the demo inbox.
  */
 export const sendDemoInvite = onCall(async (request) => {
@@ -44,7 +43,7 @@ export const sendDemoInvite = onCall(async (request) => {
     throw new HttpsError('internal', 'Demo account not configured');
   }
 
-  if (!GMAIL_APP_PASSWORD) {
+  if (!RESEND_API_KEY) {
     throw new HttpsError('internal', 'Email configuration missing');
   }
 
@@ -63,8 +62,7 @@ export const sendDemoInvite = onCall(async (request) => {
     const lastActivity: admin.firestore.Timestamp | undefined = data.lastDemoActivity;
 
     const activityTs = lastActivity ?? lockedAt;
-    const isStale =
-      activityTs && Date.now() - activityTs.toMillis() > 15 * 60 * 1000;
+    const isStale = activityTs && Date.now() - activityTs.toMillis() > 15 * 60 * 1000;
 
     if (!isStale) {
       throw new HttpsError(
@@ -82,13 +80,9 @@ export const sendDemoInvite = onCall(async (request) => {
     handleCodeInApp: true,
   });
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: SENDER_EMAIL, pass: GMAIL_APP_PASSWORD },
-  });
-
-  await transporter.sendMail({
-    from: `"Vidopick" <${SENDER_EMAIL}>`,
+  const resend = new Resend(RESEND_API_KEY);
+  await resend.emails.send({
+    from: 'Vidopick <hello@vidopick.com>',
     to: recipientEmail,
     subject: 'Your Vidopick demo access link',
     html: buildDemoAccessEmail(recipientEmail, signInLink),

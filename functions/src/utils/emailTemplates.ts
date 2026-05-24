@@ -16,12 +16,12 @@ export function buildMemberInviteEmail(
   memberName: string,
   orgName: string,
   canApprovePro: boolean,
-  signInLink: string,
+  signInLink: string
 ): string {
   const year = new Date().getFullYear();
   const proLine = canApprovePro
-    ? " You can also review and approve Pro account requests from families who want to subscribe to your invites."
-    : "";
+    ? ' You can also review and approve Pro account requests from families who want to subscribe to your invites.'
+    : '';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -92,10 +92,7 @@ export function buildMemberInviteEmail(
 /**
  * Sent to an organization account when an admin invites them to Vidopick.
  */
-export function buildInviteEmail(
-  organizationName: string,
-  signInLink: string,
-): string {
+export function buildInviteEmail(organizationName: string, signInLink: string): string {
   const year = new Date().getFullYear();
   return `<!DOCTYPE html>
 <html lang="en">
@@ -121,7 +118,7 @@ export function buildInviteEmail(
             <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">Welcome to Vidopick</h1>
             <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${organizationName},</p>
             <p style="margin:0 0 36px;font-size:15px;color:#334155;line-height:1.7;">
-              Your advertising account on Vidopick is ready. Click the button below to access your dashboard and start managing your campaigns.
+              Your organization account on Vidopick is ready. Click the button below to access your dashboard and start managing your campaigns.
             </p>
 
             <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 36px;">
@@ -160,10 +157,7 @@ export function buildInviteEmail(
 </html>`;
 }
 
-export function buildDemoAccessEmail(
-  recipientEmail: string,
-  signInLink: string,
-): string {
+export function buildDemoAccessEmail(recipientEmail: string, signInLink: string): string {
   const year = new Date().getFullYear();
   return `<!DOCTYPE html>
 <html lang="en">
@@ -302,12 +296,12 @@ export function buildMemberSubscriberNotificationEmail(
   subscriberName: string,
   subscriberEmail: string | undefined,
   organizationName: string,
-  dashboardUrl: string,
+  dashboardUrl: string
 ): string {
   const year = new Date().getFullYear();
   const emailLine = subscriberEmail
     ? `<p style="margin:0 0 36px;font-size:14px;color:#64748b;line-height:1.6;">Their email: <strong>${subscriberEmail}</strong></p>`
-    : "";
+    : '';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -375,12 +369,12 @@ export function buildOrgSubscriberNotificationEmail(
   orgName: string,
   subscriberName: string,
   subscriberEmail: string | undefined,
-  dashboardUrl: string,
+  dashboardUrl: string
 ): string {
   const year = new Date().getFullYear();
   const emailLine = subscriberEmail
     ? `<p style="margin:0 0 36px;font-size:14px;color:#64748b;line-height:1.6;">Their email: <strong>${subscriberEmail}</strong></p>`
-    : "";
+    : '';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -443,17 +437,49 @@ export function buildOrgSubscriberNotificationEmail(
 </html>`;
 }
 
-export function buildProApprovalEmail(
-  displayName: string,
-  orgName: string,
-): string {
+export function buildProApprovalEmail(displayName: string, orgName: string): string {
   const year = new Date().getFullYear();
+
+  const benefits = [
+    { icon: '👨‍👩‍👧', text: 'Multiple profiles, one for each family member' },
+    { icon: '🔄', text: 'Playlists sync across all your devices' },
+    {
+      icon: '✅',
+      text: 'Always up to date when an profile you follow to is updated',
+    },
+    {
+      icon: '⏱️',
+      text: 'Limit daily viewing time per profile across all devices',
+    },
+    {
+      icon: '📊',
+      text: '30-day history with detailed viewing stats for each profile',
+    },
+    { icon: '🤝', text: 'Follow profiles and share your own with friends' },
+  ];
+
+  const benefitRows = benefits
+    .map(
+      ({ icon, text }) => `
+    <tr>
+      <td style="padding:6px 0;">
+        <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;">
+          <tr>
+            <td style="width:32px;vertical-align:top;padding-top:1px;font-size:17px;">${icon}</td>
+            <td style="font-size:14px;color:#334155;line-height:1.6;">${text}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>`
+    )
+    .join('');
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Your Vidopick Pro account is ready</title>
+  <title>You're a Vidopick Pro!</title>
   <style>${FONT_FACE}</style>
 </head>
 <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
@@ -461,28 +487,79 @@ export function buildProApprovalEmail(
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
 
+        <!-- ── Hero (dark navy with stars) ── -->
         <tr>
-          <td style="padding-bottom:32px;text-align:center;">
-            <span style="${LOGO_STYLE}">Vidopick</span>
+          <td style="background-color:#0b172a;border-radius:20px 20px 0 0;padding:48px 32px 40px;text-align:center;overflow:hidden;position:relative;">
+
+            <!-- Vidopick wordmark -->
+            <p style="margin:0 0 32px;"><span style="${LOGO_STYLE}color:#ffffff;">Vidopick</span></p>
+
+            <!-- Pro character image -->
+            <img src="https://vidopick.com/images/pro.png"
+                 alt="Vidopick Pro"
+                 width="160" height="160"
+                 style="display:block;margin:0 auto 28px;border-radius:24px;width:160px;height:160px;object-fit:cover;" />
+
+            <!-- Star row -->
+            <p style="margin:0 0 12px;font-size:22px;letter-spacing:8px;line-height:1;">
+              <span style="color:#ffc179;">&#9733;</span>
+              <span style="color:#fe9e32;">&#10022;</span>
+              <span style="color:#ffd93d;">&#9733;</span>
+              <span style="color:#fe9e32;">&#10022;</span>
+              <span style="color:#ffc179;">&#9733;</span>
+            </p>
+
+            <!-- Main title -->
+            <h1 style="margin:0 0 10px;font-size:38px;font-weight:800;color:#ffffff;line-height:1.1;letter-spacing:-0.5px;">
+              You're a Pro!
+            </h1>
+
+            <!-- Subtitle -->
+            <p style="margin:0;font-size:15px;font-weight:600;color:#fe9e32;letter-spacing:0.5px;">
+              &#10022;&nbsp; Sponsored by ${orgName} &nbsp;&#10022;
+            </p>
+
           </td>
         </tr>
 
+        <!-- ── White body card ── -->
         <tr>
-          <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
-            <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">You have Vidopick Pro!</h1>
-            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${displayName},</p>
-            <p style="margin:0 0 36px;font-size:15px;color:#334155;line-height:1.7;">
-              <strong>${orgName}</strong> has approved your request. Your Vidopick Pro account is now active. Open the app to enjoy it.
+          <td style="background:#ffffff;border-radius:0 0 20px 20px;padding:36px 40px 40px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.10);">
+
+            <p style="margin:0 0 6px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${displayName},</p>
+            <p style="margin:0 0 28px;font-size:15px;color:#334155;line-height:1.7;">
+              Welcome to Vidopick Pro! Here's everything you can now do:
             </p>
+
+            <!-- Benefits -->
+            <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;background:#f8fafc;border-radius:14px;padding:16px 20px;margin-bottom:32px;">
+              <tbody>
+                ${benefitRows}
+              </tbody>
+            </table>
+
+            <!-- CTA button -->
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 32px;">
+              <tr>
+                <td style="background-color:#f08d07;border-radius:12px;box-shadow:0 4px 14px rgba(240,141,7,0.40);">
+                  <a href="https://vidopick.com"
+                     style="display:inline-block;padding:15px 40px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;letter-spacing:0.02em;white-space:nowrap;">
+                    Open Vidopick &nbsp;&#8594;
+                  </a>
+                </td>
+              </tr>
+            </table>
 
             <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 24px;" />
 
             <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
               You received this email because you requested a sponsored Pro account on Vidopick.
+              Need help? Visit <a href="https://vidopick.com/contact/" style="color:#94a3b8;">vidopick.com/contact</a>.
             </p>
           </td>
         </tr>
 
+        <!-- ── Footer ── -->
         <tr>
           <td style="padding-top:24px;text-align:center;">
             <p style="margin:0;font-size:12px;color:#94a3b8;">
@@ -499,10 +576,7 @@ export function buildProApprovalEmail(
 </html>`;
 }
 
-export function buildProDeclinedEmail(
-  displayName: string,
-  orgName: string,
-): string {
+export function buildProDeclinedEmail(displayName: string, orgName: string): string {
   const year = new Date().getFullYear();
   return `<!DOCTYPE html>
 <html lang="en">
@@ -558,7 +632,7 @@ export function buildProDeclinedEmail(
 /**
  * Sent when an organization revokes a user's sponsored Pro membership.
  *
- * @param displayName   - user's name as stored in the revoking org's identities
+ * @param displayName   - user's display name from Firebase Auth
  * @param revokedOrgName - the org that removed them
  * @param remainingOrgNames - names of orgs that still sponsor them (empty = fully lost Pro)
  */
@@ -569,7 +643,7 @@ export function buildSponsorshipCancelledEmail(
   recipientName: string,
   subscriberName: string,
   orgName: string,
-  dashboardUrl: string,
+  dashboardUrl: string
 ): string {
   const year = new Date().getFullYear();
   return `<!DOCTYPE html>
@@ -638,7 +712,7 @@ export function buildSponsorshipCancelledEmail(
 export function buildProRevokedEmail(
   displayName: string,
   revokedOrgName: string,
-  remainingOrgNames: string[],
+  remainingOrgNames: string[]
 ): string {
   const year = new Date().getFullYear();
 
@@ -648,11 +722,9 @@ export function buildProRevokedEmail(
       ? `<strong>${remainingOrgNames[0]}</strong>`
       : remainingOrgNames
           .map((n, i) =>
-            i < remainingOrgNames.length - 1
-              ? `<strong>${n}</strong>`
-              : `and <strong>${n}</strong>`,
+            i < remainingOrgNames.length - 1 ? `<strong>${n}</strong>` : `and <strong>${n}</strong>`
           )
-          .join(", ");
+          .join(', ');
 
   const bodyParagraph = stillCovered
     ? `However, your Pro membership is still covered by ${remainingList}. You can keep enjoying all Pro features in the app.`
@@ -680,7 +752,7 @@ export function buildProRevokedEmail(
         <tr>
           <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
             <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">
-              ${stillCovered ? "A change to your Pro membership" : "Your Pro membership has ended"}
+              ${stillCovered ? 'A change to your Pro membership' : 'Your Pro membership has ended'}
             </h1>
             <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${displayName},</p>
             <p style="margin:0 0 16px;font-size:15px;color:#334155;line-height:1.7;">
@@ -758,6 +830,87 @@ export function buildSignInEmail(signInLink: string): string {
 
             <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
               This link expires in 1 hour. If you didn't request this, you can safely ignore this email.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding-top:24px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              &copy; ${year} Vidopick &middot;
+              <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Sent to a staff member when an org invites them via the app-only flow.
+ * The link opens Vidopick (or the App Store) — no dashboard visit needed.
+ */
+export function buildMemberAppInviteEmail(
+  memberName: string,
+  orgName: string,
+  inviteLink: string
+): string {
+  const year = new Date().getFullYear();
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${orgName} invites you to Vidopick</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+
+        <tr>
+          <td style="padding-bottom:32px;text-align:center;">
+            <span style="${LOGO_STYLE}">Vidopick</span>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
+            <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">${orgName} invites you to Vidopick</h1>
+            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${memberName},</p>
+            <p style="margin:0 0 32px;font-size:15px;color:#334155;line-height:1.7;">
+              You've been added as a staff member for <strong>${orgName}</strong> on Vidopick.
+              Tap the button below to get the app and accept your invite — it only takes a minute.
+            </p>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 32px;">
+              <tr>
+                <td style="background-color:#1d4ed8;border-radius:10px;">
+                  <a href="${inviteLink}"
+                     style="display:inline-block;padding:15px 36px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.01em;white-space:nowrap;">
+                    Get Vidopick &rarr;
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0 0 8px;font-size:13px;color:#64748b;line-height:1.6;text-align:center;">
+              Already have Vidopick? Open the app and paste this link:
+            </p>
+            <p style="margin:0 0 32px;font-size:13px;font-weight:600;color:#1d4ed8;line-height:1.6;text-align:center;word-break:break-all;">
+              ${inviteLink}
+            </p>
+
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 24px;" />
+
+            <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
+              This link expires in 14 days. If you weren't expecting this, you can safely ignore this email.
+              For help, visit <a href="https://vidopick.com/contact/" style="color:#94a3b8;">vidopick.com/contact</a>.
             </p>
           </td>
         </tr>

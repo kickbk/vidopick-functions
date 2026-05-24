@@ -48,7 +48,11 @@ export const trackAdImpression = onRequest(
           impression;
 
         // Update ad document stats
-        const adRef = db.collection('organizations').doc(organizationId).collection('ads').doc(adId);
+        const adRef = db
+          .collection('organizations')
+          .doc(organizationId)
+          .collection('ads')
+          .doc(adId);
 
         // Aggregate updates per ad
         if (!updates[adId]) {

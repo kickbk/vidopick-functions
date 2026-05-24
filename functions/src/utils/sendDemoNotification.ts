@@ -1,42 +1,34 @@
-import * as nodemailer from "nodemailer";
+import { Resend } from 'resend';
 
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
-const SENDER_EMAIL = "vidopickhelp@gmail.com";
-const NOTIFY_EMAIL = "vidopick@gmail.com";
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const NOTIFY_EMAIL = 'hello@vidopick.com';
 
 /**
- * Sends a demo session notification to vidopick@gmail.com via Gmail SMTP.
+ * Sends a demo session notification to hello@vidopick.com via Resend.
  * Fire-and-forget — errors are logged but never thrown.
  */
 export async function sendDemoNotification(
   recipientEmail: string | null,
-  event: "requested" | "started" = "started",
+  event: 'requested' | 'started' = 'started'
 ): Promise<void> {
-  if (!GMAIL_APP_PASSWORD) {
-    console.warn("sendDemoNotification: GMAIL_APP_PASSWORD not set, skipping");
+  if (!RESEND_API_KEY) {
+    console.warn('[email] RESEND_API_KEY not set, skipping');
     return;
   }
 
-  const who = recipientEmail || "(unknown)";
-  const when = new Date().toLocaleString("en-US", {
-    timeZone: "America/Los_Angeles",
-    dateStyle: "medium",
-    timeStyle: "short",
+  const who = recipientEmail || '(unknown)';
+  const when = new Date().toLocaleString('en-US', {
+    timeZone: 'America/Los_Angeles',
+    dateStyle: 'medium',
+    timeStyle: 'short',
   });
 
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: SENDER_EMAIL,
-      pass: GMAIL_APP_PASSWORD,
-    },
-  });
-
+  const resend = new Resend(RESEND_API_KEY);
   try {
-    await transporter.sendMail({
-      from: `"Vidopick Notifications" <${SENDER_EMAIL}>`,
+    await resend.emails.send({
+      from: 'Vidopick <hello@vidopick.com>',
       to: NOTIFY_EMAIL,
-      subject: `Demo ${event === "requested" ? "invite requested" : "session started"} — ${who}`,
+      subject: `Demo ${event === 'requested' ? 'invite requested' : 'session started'} — ${who}`,
       html: `
         <p style="font-family:sans-serif;font-size:15px;color:#111;">${event === 'requested' ? 'Someone requested demo access.' : 'A demo session was just started.'}</p>
         <table style="font-family:sans-serif;font-size:14px;border-collapse:collapse;">
@@ -51,10 +43,8 @@ export async function sendDemoNotification(
         </table>
       `,
     });
-    console.log(
-      `sendDemoNotification: notified ${NOTIFY_EMAIL} (demo user: ${who})`,
-    );
+    console.log(`sendDemoNotification: notified ${NOTIFY_EMAIL} (demo user: ${who})`);
   } catch (err: any) {
-    console.error("sendDemoNotification: failed to send email:", err.message);
+    console.error('sendDemoNotification: failed to send email:', err.message);
   }
 }

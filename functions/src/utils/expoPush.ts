@@ -15,12 +15,14 @@ interface ExpoPushMessage {
   title: string;
   body: string;
   data?: Record<string, string>;
+  badge?: number;
 }
 
 export async function sendExpoPushNotifications(
   tokens: string[],
   notification: { title: string; body: string },
-  data?: Record<string, string>
+  data?: Record<string, string>,
+  badge?: number
 ): Promise<void> {
   if (tokens.length === 0) return;
 
@@ -29,6 +31,7 @@ export async function sendExpoPushNotifications(
     title: notification.title,
     body: notification.body,
     ...(data ? { data } : {}),
+    ...(badge !== undefined ? { badge } : {}),
   }));
 
   try {

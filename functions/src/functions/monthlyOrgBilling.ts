@@ -2,7 +2,7 @@ import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import { defineSecret } from 'firebase-functions/params';
-import { sendExpoPushNotifications } from '../utils/expoPush.js';
+import { notifyUser } from '../utils/notifyUser.js';
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -42,9 +42,15 @@ export const monthlyOrgBilling = onSchedule(
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
     const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)); // = now
-    const monthLabel = monthStart.toLocaleString('default', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+    const monthLabel = monthStart.toLocaleString('default', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
 
-    console.log(`[monthlyOrgBilling] billing period: ${monthStart.toISOString()} → ${monthEnd.toISOString()}`);
+    console.log(
+      `[monthlyOrgBilling] billing period: ${monthStart.toISOString()} → ${monthEnd.toISOString()}`
+    );
 
     // Collect orgs to process: active sponsors + those whose cancellation is due today
     const [sponsoringSnap, cancellingSnap] = await Promise.all([
@@ -108,8 +114,8 @@ export const monthlyOrgBilling = onSchedule(
 
       // Skip management fee for the partial first month (waived until billingStartDate)
       const billingStartDate: admin.firestore.Timestamp | undefined = orgData.billingStartDate;
-      const managementFeeActive = managementInCents > 0 &&
-        (!billingStartDate || billingStartDate.toDate() <= monthStart);
+      const managementFeeActive =
+        managementInCents > 0 && (!billingStartDate || billingStartDate.toDate() <= monthStart);
 
       const hasManagementFee = managementFeeActive;
       const hasUserCharges = billableCount > 0 && sponsoredProInCents > 0;
@@ -132,7 +138,11 @@ export const monthlyOrgBilling = onSchedule(
             amount: managementInCents,
             currency: 'usd',
             description: `Vidopick Pro Management (${monthLabel})`,
-            metadata: { organizationId: orgId, type: 'management', billingMonth: monthStart.toISOString().slice(0, 7) },
+            metadata: {
+              organizationId: orgId,
+              type: 'management',
+              billingMonth: monthStart.toISOString().slice(0, 7),
+            },
           });
         }
 
@@ -214,7 +224,9 @@ async function suspendOrg(
     const userSnap = await db.doc(`users/${uid}`).get();
     if (!userSnap.exists) continue;
     const userData = userSnap.data()!;
-    const remainingSponsors: string[] = (userData.sponsoredBy ?? []).filter((id: string) => id !== orgId);
+    const remainingSponsors: string[] = (userData.sponsoredBy ?? []).filter(
+      (id: string) => id !== orgId
+    );
 
     await db.doc(`users/${uid}`).update({
       sponsoredBy: admin.firestore.FieldValue.arrayRemove(orgId),
@@ -223,16 +235,12 @@ async function suspendOrg(
 
     if (remainingSponsors.length === 0) {
       const deviceTokens: string[] = userData.deviceTokens ?? [];
-      if (deviceTokens.length > 0) {
-        await sendExpoPushNotifications(
-          deviceTokens,
-          {
-            title: 'Your Vidopick Pro access has ended',
-            body: `${orgName} has stopped sponsoring Pro accounts. You can purchase your own Pro subscription to continue.`,
-          },
-          { type: 'pro_suspended', organizationId: orgId },
-        ).catch(() => {});
-      }
+      const notifTitle = 'Your Vidopick Pro access has ended';
+      const notifBody = `${orgName} has stopped sponsoring Pro accounts. You can purchase your own Pro subscription to continue.`;
+      await notifyUser(db, uid, deviceTokens, notifTitle, notifBody, {
+        type: 'pro_suspended',
+        organizationId: orgId,
+      }).catch(() => {});
     }
   }
 

@@ -77,11 +77,20 @@ export const stripeWebhook = onRequest(
             const billingStartDate = admin.firestore.Timestamp.fromDate(
               new Date(Date.UTC(setupDate.getUTCFullYear(), setupDate.getUTCMonth() + 1, 1))
             );
-            await db.doc(`organizations/${orgId}`).set(
-              { stripeCustomerId: customer, billingActive: true, billingStatus: 'ok', billingStartDate },
-              { merge: true }
+            await db
+              .doc(`organizations/${orgId}`)
+              .set(
+                {
+                  stripeCustomerId: customer,
+                  billingActive: true,
+                  billingStatus: 'ok',
+                  billingStartDate,
+                },
+                { merge: true }
+              );
+            console.log(
+              `[stripeWebhook] org setup completed orgId=${orgId} billingStartDate=${billingStartDate.toDate().toISOString()}`
             );
-            console.log(`[stripeWebhook] org setup completed orgId=${orgId} billingStartDate=${billingStartDate.toDate().toISOString()}`);
           } else if (uid) {
             // User self-pay checkout
             const subscription = session.subscription as string | null;
@@ -111,8 +120,12 @@ export const stripeWebhook = onRequest(
           if (stripeStatus2 === 'active' || stripeStatus2 === 'trialing') proStatus2 = 'active';
           else if (stripeStatus2 === 'past_due') proStatus2 = 'grace';
           else proStatus2 = 'none';
-          await db.doc(`users/${uid2}`).set({ proStatus: proStatus2, stripeSubscriptionId: subscription.id }, { merge: true });
-          console.log(`[stripeWebhook] user subscription updated uid=${uid2} → proStatus=${proStatus2}`);
+          await db
+            .doc(`users/${uid2}`)
+            .set({ proStatus: proStatus2, stripeSubscriptionId: subscription.id }, { merge: true });
+          console.log(
+            `[stripeWebhook] user subscription updated uid=${uid2} → proStatus=${proStatus2}`
+          );
           break;
         }
 
@@ -145,36 +158,42 @@ export const stripeWebhook = onRequest(
 
           if (orgId) {
             // Org invoice failure — mark billing status and notify admin
-            await db.doc(`organizations/${orgId}`).set(
-              { billingStatus: 'past_due', billingFailedAt: admin.firestore.FieldValue.serverTimestamp() },
-              { merge: true }
+            await db
+              .doc(`organizations/${orgId}`)
+              .set(
+                {
+                  billingStatus: 'past_due',
+                  billingFailedAt: admin.firestore.FieldValue.serverTimestamp(),
+                },
+                { merge: true }
+              );
+            console.log(
+              `[stripeWebhook] org invoice payment_failed orgId=${orgId} attempt=${invoice.attempt_count}`
             );
-            console.log(`[stripeWebhook] org invoice payment_failed orgId=${orgId} attempt=${invoice.attempt_count}`);
 
             // Only email on the first attempt — Stripe Smart Retries handle the rest silently
             if ((invoice.attempt_count ?? 1) !== 1) break;
 
             // Email org admin (non-fatal)
             try {
-              const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
-              const SENDER_EMAIL = 'vidopickhelp@gmail.com';
-              if (GMAIL_APP_PASSWORD) {
+              const RESEND_API_KEY = process.env.RESEND_API_KEY;
+              if (RESEND_API_KEY) {
                 const orgSnap = await db.doc(`organizations/${orgId}`).get();
                 const orgData = orgSnap.data();
                 const authUid: string | undefined = orgData?.authUid;
                 if (authUid) {
-                  const orgAuthUser = await admin.auth().getUser(authUid).catch(() => null);
+                  const orgAuthUser = await admin
+                    .auth()
+                    .getUser(authUid)
+                    .catch(() => null);
                   if (orgAuthUser?.email) {
-                    const nodemailer = await import('nodemailer');
+                    const { Resend } = await import('resend');
                     const orgName: string = orgData?.name ?? 'your organization';
                     const amountDue: number = invoice.amount_due ?? 0;
                     const dollars = (amountDue / 100).toFixed(2);
-                    const transporter = nodemailer.default.createTransport({
-                      service: 'gmail',
-                      auth: { user: SENDER_EMAIL, pass: GMAIL_APP_PASSWORD },
-                    });
-                    await transporter.sendMail({
-                      from: `"Vidopick" <${SENDER_EMAIL}>`,
+                    const resend = new Resend(RESEND_API_KEY);
+                    await resend.emails.send({
+                      from: 'Vidopick <hello@vidopick.com>',
                       to: orgAuthUser.email,
                       subject: `Action required: Payment failed for ${orgName}`,
                       html: `
@@ -185,7 +204,9 @@ export const stripeWebhook = onRequest(
                         <p>— The Vidopick Team</p>
                       `,
                     });
-                    console.log(`[stripeWebhook] org payment failure email sent to ${orgAuthUser.email}`);
+                    console.log(
+                      `[stripeWebhook] org payment failure email sent to ${orgAuthUser.email}`
+                    );
                   }
                 }
               }
@@ -201,10 +222,7 @@ export const stripeWebhook = onRequest(
               .get();
 
             if (!snap.empty) {
-              await snap.docs[0].ref.set(
-                { proStatus: 'grace' },
-                { merge: true }
-              );
+              await snap.docs[0].ref.set({ proStatus: 'grace' }, { merge: true });
               console.log(`[stripeWebhook] payment_failed → grace uid=${snap.docs[0].id}`);
             }
           }
@@ -216,10 +234,9 @@ export const stripeWebhook = onRequest(
           const orgId: string | undefined = invoice.metadata?.organizationId;
           if (orgId) {
             // Clear past_due status when org pays successfully
-            await db.doc(`organizations/${orgId}`).set(
-              { billingStatus: 'ok', billingFailedAt: null },
-              { merge: true }
-            );
+            await db
+              .doc(`organizations/${orgId}`)
+              .set({ billingStatus: 'ok', billingFailedAt: null }, { merge: true });
             console.log(`[stripeWebhook] org invoice paid orgId=${orgId}`);
           }
           break;

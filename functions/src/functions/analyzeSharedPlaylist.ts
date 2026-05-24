@@ -1,6 +1,6 @@
 import * as admin from 'firebase-admin';
 import { onRequest } from 'firebase-functions/v2/https';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import axios from 'axios';
 
 // 1. Initialize Firestore
@@ -11,16 +11,27 @@ const db = admin.firestore();
 
 // --- CONFIGURATION ---
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const EMAIL_ACCOUNT = process.env.EMAIL_ACCOUNT;
-const EMAIL_PASS = process.env.EMAIL_PASS;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 // const MIN_VIDEOS = 5;
 
 // --- HELPER DATA ---
 const KNOWN_SHOWS = [
-  'Bluey', 'Peppa Pig', 'Paw Patrol', 'Cocomelon', 'Blippi', 'Sesame Street',
-  'Mickey Mouse', 'SpongeBob', 'Pokemon', 'Super Simple Songs', 'Little Baby Bum',
-  'Daniel Tiger', 'PJ Masks', 'Thomas & Friends', 'Curious George'
+  'Bluey',
+  'Peppa Pig',
+  'Paw Patrol',
+  'Cocomelon',
+  'Blippi',
+  'Sesame Street',
+  'Mickey Mouse',
+  'SpongeBob',
+  'Pokemon',
+  'Super Simple Songs',
+  'Little Baby Bum',
+  'Daniel Tiger',
+  'PJ Masks',
+  'Thomas & Friends',
+  'Curious George',
 ];
 
 // --- HELPERS ---
@@ -28,7 +39,12 @@ const KNOWN_SHOWS = [
 function decodeHtmlEntities(text: string): string {
   if (!text) return '';
   const entities: { [key: string]: string } = {
-    '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&apos;': "'",
+    '&amp;': '&',
+    '&lt;': '<',
+    '&gt;': '>',
+    '&quot;': '"',
+    '&#39;': "'",
+    '&apos;': "'",
   };
   return text.replace(/&(?:amp|lt|gt|quot|#39|apos);/g, (m) => entities[m] || m);
 }
@@ -60,7 +76,12 @@ function detectContentType(title: string, description: string): string | null {
   return null;
 }
 
-function enhanceTags(aiTags: string[], title: string, channelTitle: string, description: string = ''): string[] {
+function enhanceTags(
+  aiTags: string[],
+  title: string,
+  channelTitle: string,
+  description: string = ''
+): string[] {
   const enhanced: string[] = [];
   const showName = extractShowName(title, channelTitle);
   if (showName) enhanced.push(showName);
@@ -128,7 +149,9 @@ async function fetchPlaylistXml(playlistId: string): Promise<any> {
     const response = await axios.get(url, { timeout: 8000 });
     const xml = response.data;
     const mainTitleMatch = xml.match(/<title>(.*?)<\/title>/);
-    const playlistTitle = mainTitleMatch ? decodeHtmlEntities(mainTitleMatch[1]) : 'Unknown Playlist';
+    const playlistTitle = mainTitleMatch
+      ? decodeHtmlEntities(mainTitleMatch[1])
+      : 'Unknown Playlist';
     const nameMatch = xml.match(/<name>(.*?)<\/name>/);
     const author = nameMatch ? decodeHtmlEntities(nameMatch[1]) : 'YouTube Channel';
     const channelIdMatch = xml.match(/\/channel\/(UC[\w-]+)/);
@@ -143,7 +166,16 @@ async function fetchPlaylistXml(playlistId: string): Promise<any> {
     const viewMatches = [...xml.matchAll(/<media:statistics views="(\d+)"\/>/g)];
     viewMatches.forEach((m) => videoViews.push(parseInt(m[1], 10)));
 
-    return { id: playlistId, title: playlistTitle, author, channelId, videoTitles, videoViews, firstVideoId, totalCount: videoTitles.length };
+    return {
+      id: playlistId,
+      title: playlistTitle,
+      author,
+      channelId,
+      videoTitles,
+      videoViews,
+      firstVideoId,
+      totalCount: videoTitles.length,
+    };
   } catch (error: any) {
     if (error.response?.status === 404) {
       // RSS feed doesn't serve unlisted playlists — fall back to YouTube Data API
@@ -154,25 +186,22 @@ async function fetchPlaylistXml(playlistId: string): Promise<any> {
 }
 
 async function sendModerationEmail(playlistData: any) {
-  if (!EMAIL_ACCOUNT || !EMAIL_PASS) {
-    console.error('Email configuration missing');
+  if (!RESEND_API_KEY) {
+    console.warn('[email] RESEND_API_KEY not set, skipping');
     return;
   }
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: EMAIL_ACCOUNT, pass: EMAIL_PASS },
-  });
-
-  const mailOptions = {
-    from: `Vidopick Moderation <${EMAIL_ACCOUNT}>`,
-    to: EMAIL_ACCOUNT, // Send to yourself
-    subject: `📝 New Playlist Submitted: "${playlistData.title}"`,
-    html: `
+  const resend = new Resend(RESEND_API_KEY);
+  try {
+    await resend.emails.send({
+      from: 'Vidopick <hello@vidopick.com>',
+      to: 'hello@vidopick.com',
+      subject: `📝 New Playlist Submitted: "${playlistData.title}"`,
+      html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
         <h2 style="color: #2c3e50; margin-top: 0;">New Playlist Submission</h2>
         <p>A user shared a new playlist via the Vidopick app. It has been saved but requires approval.</p>
-        
+
         <div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin: 20px 0;">
           <h3 style="margin: 0 0 10px 0;">${playlistData.title}</h3>
           <p style="margin: 5px 0;"><strong>Author:</strong> ${playlistData.author}</p>
@@ -186,22 +215,18 @@ async function sendModerationEmail(playlistData: any) {
           <a href="https://www.youtube.com/playlist?list=${playlistData.id}" style="background-color: #e74c3c; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin-right: 10px;">View on YouTube</a>
           <a href="https://console.firebase.google.com/u/0/project/${process.env.GCLOUD_PROJECT}/firestore/data/~2FscannedPlaylists~2F${playlistData.id}" style="background-color: #3498db; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Manage in Firestore</a>
         </div>
-        
+
         <p style="color: #7f8c8d; font-size: 12px; margin-top: 20px;">
           This playlist is currently set to <strong>isApproved: false</strong>. Users can see it in their personal library, but it won't appear in public discovery until approved.
         </p>
       </div>
     `,
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
+    });
     console.log('Moderation email sent successfully');
   } catch (error) {
     console.error('Failed to send moderation email:', error);
   }
 }
-
 
 // --- MAIN FUNCTION ---
 
@@ -238,8 +263,8 @@ export const analyzeSharedPlaylist = onRequest(
       const data = await fetchPlaylistXml(playlistId);
       // We don't want to limit by number of videos. We will not approve small lists, but allow them to be added.
       // if (data.totalCount < MIN_VIDEOS) {
-      //   response.status(400).json({ 
-      //     error: `Playlist has too few videos (${data.totalCount}). Minimum required is ${MIN_VIDEOS}.` 
+      //   response.status(400).json({
+      //     error: `Playlist has too few videos (${data.totalCount}). Minimum required is ${MIN_VIDEOS}.`
       //   });
       //   return;
       // }
@@ -247,21 +272,50 @@ export const analyzeSharedPlaylist = onRequest(
       if (!OPENAI_API_KEY) throw new Error('Missing OpenAI API Key');
 
       // 2. OpenAI Analysis (Consistent Prompt)
-      const prompt = `Analyze this YouTube playlist for children.\nPlaylist: ${data.title}\nChannel: ${data.author}\nDescription: No description (Shared from mobile)\nFirst 10 video titles:\n${data.videoTitles.slice(0, 10).map((t:string, i:number) => `${i + 1}. ${t}`).join('\n')}\nRespond with ONLY a JSON object (no markdown):\n{\n  "isAppropriate": true/false,\n  "confidenceScore": 1-10,\n  "ageMin": 0-12,\n  "ageMax": 0-12,\n  "categories": ["Category1"] or ["Category1", "Category2"],\n  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],\n  "languages": ["English"] or ["English", "Spanish"] etc,\n  "briefDescription": "1-2 sentence description",\n  "reasoning": "Brief explanation"\n}\nIMPORTANT for categories field: always return an array. Use values from this list when possible: ["Educational","Music","Stories","Animation","Art & Crafts","Dance & Fitness","Health & Wellness","Language","Entertainment"]. Prefer existing categories — only use a new value if the content is genuinely distinct. 1 category is ideal, 2 if truly both apply.\nIMPORTANT for languages field: always return an array. Single language: ["English"]. Multiple: ["English", "Spanish"]. Never use "Multiple" — list the actual languages. Tags should be concise themes.`;
+      const videoTitlesText = data.videoTitles
+        .slice(0, 10)
+        .map((t: string, i: number) => `${i + 1}. ${t}`)
+        .join('\n');
+      const prompt = `Analyze this YouTube playlist for children.
+Playlist: ${data.title}
+Channel: ${data.author}
+First 10 video titles:
+${videoTitlesText}
+Respond with ONLY a JSON object (no markdown):
+{
+  "isAppropriate": true/false,
+  "confidenceScore": 1-10,
+  "ageMin": 0-12,
+  "ageMax": 0-12,
+  "categories": ["Category1"] or ["Category1", "Category2"],
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
+  "languages": ["<detected language>"],
+  "briefDescription": "1-2 sentence description",
+  "reasoning": "Brief explanation"
+}
+IMPORTANT for categories field: always return an array. Use values from this list when possible: ["Educational","Music","Stories","Animation","Art & Crafts","Dance & Fitness","Health & Wellness","Language","Entertainment"]. Prefer existing categories — only use a new value if the content is genuinely distinct. 1 category is ideal, 2 if truly both apply.
+IMPORTANT for languages field: always return an array. Rules: (1) Explicit labels like "English Song" or "Spanish Version" in a title are definitive. (2) If the majority of titles share a language, do not add a second language from SEO keywords appended to just one title. (3) Non-English words that form the main part of titles are a strong signal. Never use "Multiple" — list the actual language names. Tags should be concise themes.`;
 
       const aiResponse = await axios.post(
         'https://api.openai.com/v1/chat/completions',
         {
           model: 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: 'You analyze kids content. Provide specific but concise tags about content themes. Avoid character names but keep meaningful context.' }, 
-            { role: 'user', content: prompt }
+            {
+              role: 'system',
+              content:
+                'You analyze kids content. Provide specific but concise tags about content themes. Avoid character names but keep meaningful context.',
+            },
+            { role: 'user', content: prompt },
           ],
           temperature: 0.4,
           response_format: { type: 'json_object' },
         },
         {
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${OPENAI_API_KEY}` }
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+          },
         }
       );
 
@@ -272,12 +326,13 @@ export const analyzeSharedPlaylist = onRequest(
       const engagement = calculateEngagementScore(data.videoViews);
       const aiScore = aiResult.confidenceScore || 5;
       const channelAuthority = 5; // Default for shared content without deep analysis
-      const rankingScore = Math.round((aiScore * 0.4 + channelAuthority * 0.3 + engagement * 0.2 + 0.7) * 10) / 10;
+      const rankingScore =
+        Math.round((aiScore * 0.4 + channelAuthority * 0.3 + engagement * 0.2 + 0.7) * 10) / 10;
 
-      const thumbnail = data.firstVideoId 
-        ? `https://img.youtube.com/vi/${data.firstVideoId}/mqdefault.jpg` 
+      const thumbnail = data.firstVideoId
+        ? `https://img.youtube.com/vi/${data.firstVideoId}/mqdefault.jpg`
         : '';
-      const authorUrl = data.channelId 
+      const authorUrl = data.channelId
         ? `https://www.youtube.com/channel/${data.channelId}`
         : `https://www.youtube.com/results?search_query=${encodeURIComponent(data.author)}`;
 
@@ -291,49 +346,58 @@ export const analyzeSharedPlaylist = onRequest(
         ageMin: aiResult.ageMin,
         ageMax: aiResult.ageMax,
         tags: enhancedTags,
-        categories: Array.isArray(aiResult.categories) ? aiResult.categories : [aiResult.categories || aiResult.category || 'Entertainment'],
-        languages: Array.isArray(aiResult.languages) ? aiResult.languages : [aiResult.languages || aiResult.language || 'English'],
+        categories: Array.isArray(aiResult.categories)
+          ? aiResult.categories
+          : [aiResult.categories || aiResult.category || 'Entertainment'],
+        languages: Array.isArray(aiResult.languages)
+          ? aiResult.languages
+          : [aiResult.languages || aiResult.language || 'English'],
         description: aiResult.briefDescription || 'No description available',
         sourceUrl: `https://www.youtube.com/playlist?list=${playlistId}`,
         ranking: {
           score: rankingScore,
           boost: 0,
-          factors: { aiScore, channelAuthority, engagement, freshness: 7 }
+          factors: { aiScore, channelAuthority, engagement, freshness: 7 },
         },
         channelSubscribers: 0, // Placeholder
         channelVerified: false,
-        
+
         isAppropriate: aiResult.isAppropriate,
         isApproved: false,
         reviewedBy: 'pending',
         reviewedAt: new Date().toISOString(),
-        
+
         scannedAt: new Date().toISOString(),
         scannedBy: 'share',
         updatedAt: new Date().toISOString(),
-        
+
         videoCount: data.totalCount,
         importCount: 1,
-        likes: 0
+        likes: 0,
       };
 
       // 5. Save to scannedPlaylists with isApproved: false (pending admin review) & Notify
       if (result.isAppropriate) {
         await db.collection('scannedPlaylists').doc(playlistId).set(result);
-        console.log(`[analyzeSharedPlaylist] saved ${playlistId} to scannedPlaylists (pending review)`);
+        console.log(
+          `[analyzeSharedPlaylist] saved ${playlistId} to scannedPlaylists (pending review)`
+        );
 
         // Fire & Forget Email Notification (don't block response)
-        sendModerationEmail(result).catch(e => console.error("Email failed", e));
+        sendModerationEmail(result).catch((e) => console.error('Email failed', e));
       } else {
-        console.log(`[analyzeSharedPlaylist] playlist ${playlistId} flagged as inappropriate, not saving`);
+        console.log(
+          `[analyzeSharedPlaylist] playlist ${playlistId} flagged as inappropriate, not saving`
+        );
       }
 
       response.status(200).json(result);
-
     } catch (error: any) {
       console.error('Error analyzing playlist:', error);
       if (error.message === 'PLAYLIST_NOT_FOUND') {
-        response.status(404).json({ error: 'Playlist not found on YouTube. It might be private or deleted.' });
+        response
+          .status(404)
+          .json({ error: 'Playlist not found on YouTube. It might be private or deleted.' });
       } else {
         response.status(500).json({ error: 'Failed to analyze playlist', details: error.message });
       }

@@ -1,6 +1,6 @@
 /**
  * Firebase Cloud Function to refresh playlist metadata
- * 
+ *
  * Checks playlist thumbnails and updates metadata from YouTube XML feeds
  * - Verifies existing thumbnails are still valid
  * - Fetches new thumbnails and titles if changed
@@ -10,7 +10,7 @@
 
 import * as admin from 'firebase-admin';
 import { onRequest } from 'firebase-functions/v2/https';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import axios from 'axios';
 
 if (!admin.apps.length) {
@@ -19,8 +19,7 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-const EMAIL_ACCOUNT = process.env.EMAIL_ACCOUNT;
-const EMAIL_PASS = process.env.EMAIL_PASS;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
 interface PlaylistMetadata {
   id: string;
@@ -57,7 +56,7 @@ async function isUrlAccessible(url: string, retries = 2): Promise<boolean> {
     } catch (error) {
       // If not last attempt, wait before retry
       if (attempt < retries - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
   }
@@ -80,10 +79,10 @@ async function fetchPlaylistMetadata(playlistId: string): Promise<{
 
     // Extract first video ID for thumbnail
     const videoIdMatch = response.data.match(/<yt:videoId>([a-zA-Z0-9_-]{11})<\/yt:videoId>/);
-    
+
     // Extract playlist title
     const titleMatch = response.data.match(/<title>([^<]+)<\/title>/);
-    
+
     return {
       videoId: videoIdMatch ? videoIdMatch[1] : null,
       title: titleMatch ? titleMatch[1] : null,
@@ -94,7 +93,7 @@ async function fetchPlaylistMetadata(playlistId: string): Promise<{
     if (error.response?.status === 404) {
       return { videoId: null, title: null, exists: false };
     }
-    
+
     console.error(`Error fetching metadata for ${playlistId}:`, error.message);
     throw error;
   }
@@ -107,8 +106,8 @@ async function sendNotificationEmail(
   updates: PlaylistChange[],
   removals: Array<{ id: string; title: string }>
 ): Promise<void> {
-  if (!EMAIL_ACCOUNT || !EMAIL_PASS) {
-    console.error('Email configuration missing');
+  if (!RESEND_API_KEY) {
+    console.warn('[email] RESEND_API_KEY not set, skipping');
     return;
   }
 
@@ -116,13 +115,7 @@ async function sendNotificationEmail(
     return;
   }
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: EMAIL_ACCOUNT,
-      pass: EMAIL_PASS,
-    },
-  });
+  const resend = new Resend(RESEND_API_KEY);
 
   // Build email content
   let updatesHtml = '';
@@ -130,18 +123,19 @@ async function sendNotificationEmail(
     updatesHtml = `
       <h3 style="color: #333; margin-top: 20px;">Updated Playlists (${updates.length})</h3>
       <ul style="list-style: none; padding: 0;">
-        ${updates.map(change => {
-          const changes: string[] = [];
-          
-          if (change.newThumbnail && change.oldThumbnail !== change.newThumbnail) {
-            changes.push(`Thumbnail updated`);
-          }
-          
-          if (change.newTitle && change.oldTitle !== change.newTitle) {
-            changes.push(`Title: "${change.oldTitle}" → "${change.newTitle}"`);
-          }
-          
-          return `
+        ${updates
+          .map((change) => {
+            const changes: string[] = [];
+
+            if (change.newThumbnail && change.oldThumbnail !== change.newThumbnail) {
+              changes.push(`Thumbnail updated`);
+            }
+
+            if (change.newTitle && change.oldTitle !== change.newTitle) {
+              changes.push(`Title: "${change.oldTitle}" → "${change.newTitle}"`);
+            }
+
+            return `
             <li style="margin: 15px 0; padding: 15px; background-color: #f5f5f5; border-radius: 5px;">
               <strong>${change.title}</strong> (${change.id})
               <br/>
@@ -151,7 +145,8 @@ async function sendNotificationEmail(
               ${change.newThumbnail ? `<br/><a href="${change.newThumbnail}" style="color: #0066cc; font-size: 12px;">View Thumbnail</a>` : ''}
             </li>
           `;
-        }).join('')}
+          })
+          .join('')}
       </ul>
     `;
   }
@@ -161,45 +156,47 @@ async function sendNotificationEmail(
     removalsHtml = `
       <h3 style="color: #d9534f; margin-top: 20px;">Removed Playlists (${removals.length})</h3>
       <ul style="list-style: none; padding: 0;">
-        ${removals.map(({ id, title }) => `
+        ${removals
+          .map(
+            ({ id, title }) => `
           <li style="margin: 10px 0; padding: 10px; background-color: #fff3f3; border-radius: 5px;">
             <strong>${title}</strong> (${id})
             <br/>
             <span style="color: #999; font-size: 12px;">Playlist deleted or suspended</span>
           </li>
-        `).join('')}
+        `
+          )
+          .join('')}
       </ul>
     `;
   }
 
-  const mailOptions = {
-    from: `Vidopick Alerts <${EMAIL_ACCOUNT}>`,
-    to: EMAIL_ACCOUNT,
-    subject: `Vidopick Playlist Changes Detected - ${updates.length} Updated, ${removals.length} Removed`,
-    html: `
+  try {
+    await resend.emails.send({
+      from: 'Vidopick <hello@vidopick.com>',
+      to: 'hello@vidopick.com',
+      subject: `Vidopick Playlist Changes Detected - ${updates.length} Updated, ${removals.length} Removed`,
+      html: `
       <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
         <h2 style="color: #333; border-bottom: 2px solid #0066cc; padding-bottom: 10px;">
           Vidopick Playlist Metadata Changes
         </h2>
-        
+
         <p style="color: #666;">
           Detected changes in playlist metadata at ${new Date().toLocaleString()}
         </p>
-        
+
         ${updatesHtml}
         ${removalsHtml}
-        
+
         <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;" />
-        
+
         <p style="color: #999; font-size: 12px;">
           This is an automated notification from Vidopick's playlist refresh system.
         </p>
       </div>
     `,
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
+    });
     console.log('Notification email sent successfully');
   } catch (error) {
     console.error('Failed to send notification email:', error);
@@ -247,12 +244,12 @@ export const refreshPlaylistMetadata = onRequest(
       // Process playlists sequentially with delays to avoid rate limits
       for (let i = 0; i < playlistIds.length; i++) {
         const playlistId = playlistIds[i];
-        
+
         try {
           // Fetch existing playlist data from Firestore
           const docRef = db.collection('scannedPlaylists').doc(playlistId);
           const doc = await docRef.get();
-          
+
           if (!doc.exists) {
             console.log(`Playlist ${playlistId} not found in database, skipping`);
             continue;
@@ -265,14 +262,14 @@ export const refreshPlaylistMetadata = onRequest(
           // Step 1: Check if existing thumbnail is still accessible
           if (existingThumbnail) {
             const isAccessible = await isUrlAccessible(existingThumbnail);
-            
+
             if (isAccessible) {
               console.log(`Thumbnail still valid for ${playlistId}, skipping`);
               result.unchanged.push(playlistId);
-              
+
               // Add delay before next iteration
               if (i < playlistIds.length - 1) {
-                await new Promise(resolve => setTimeout(resolve, 200));
+                await new Promise((resolve) => setTimeout(resolve, 200));
               }
               continue;
             }
@@ -285,7 +282,7 @@ export const refreshPlaylistMetadata = onRequest(
           // Step 3: Check if playlist was removed
           if (!metadata.exists) {
             console.log(`Playlist ${playlistId} was removed`);
-            
+
             // Mark as removed in Firestore
             await docRef.update({
               isRemoved: true,
@@ -300,16 +297,16 @@ export const refreshPlaylistMetadata = onRequest(
 
             // Add delay before next iteration
             if (i < playlistIds.length - 1) {
-              await new Promise(resolve => setTimeout(resolve, 200));
+              await new Promise((resolve) => setTimeout(resolve, 200));
             }
             continue;
           }
 
           // Step 4: Playlist exists, check if metadata changed
-          const newThumbnail = metadata.videoId 
+          const newThumbnail = metadata.videoId
             ? `https://img.youtube.com/vi/${metadata.videoId}/mqdefault.jpg`
             : existingThumbnail;
-          
+
           const newTitle = metadata.title || existingTitle;
 
           // Determine if update is needed
@@ -318,7 +315,7 @@ export const refreshPlaylistMetadata = onRequest(
 
           if (thumbnailChanged || titleChanged) {
             console.log(`Updating metadata for ${playlistId}`);
-            
+
             // Create the update object
             const updateData: any = {
               thumbnail: newThumbnail,
@@ -330,7 +327,7 @@ export const refreshPlaylistMetadata = onRequest(
             if (existingThumbnail) {
               updateData.previousThumbnail = existingThumbnail;
             }
-            
+
             // Update Firestore
             await docRef.update(updateData);
 
@@ -352,7 +349,6 @@ export const refreshPlaylistMetadata = onRequest(
           } else {
             result.unchanged.push(playlistId);
           }
-
         } catch (error: any) {
           console.error(`Error processing playlist ${playlistId}:`, error.message);
           // Continue with next playlist instead of failing entire batch
@@ -360,7 +356,7 @@ export const refreshPlaylistMetadata = onRequest(
 
         // Add delay between requests to avoid rate limiting
         if (i < playlistIds.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise((resolve) => setTimeout(resolve, 200));
         }
       }
 
@@ -376,7 +372,6 @@ export const refreshPlaylistMetadata = onRequest(
       });
 
       response.status(200).json(result);
-
     } catch (error: any) {
       console.error('Refresh failed:', error);
       response.status(500).json({
