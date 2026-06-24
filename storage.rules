@@ -1,0 +1,52 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // All client uploads are images, capped in size.
+    function isValidImage(maxMb) {
+      return request.resource.size < maxMb * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Affiliate profile photos — readable by anyone (needed for vidopick.com public pages),
+    // writable only by the authenticated user who owns the path.
+    // The compressUploadedImage function replaces the original .jpg with a
+    // _compressed.webp via the Admin SDK; both paths need public read.
+    match /affiliates/{uid}/photo.jpg {
+      allow read: if true;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && isValidImage(10);
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+    match /affiliates/{uid}/photo_compressed.webp {
+      allow read: if true;
+    }
+
+    // Organization logos
+    match /organizations/logos/{fileName} {
+      allow read: if true;
+      allow create, update: if request.auth.token.role == 'admin' && isValidImage(10);
+      allow delete: if request.auth.token.role == 'admin';
+    }
+
+    // Ad images
+    match /organizations/{orgId}/ads/{fileName} {
+      allow read: if true;
+      allow create, update: if request.auth.token.role == 'admin' && isValidImage(10);
+      allow delete: if request.auth.token.role == 'admin';
+    }
+
+    // Invite OG images (used by handleDeeplink for meta tags)
+    match /invite-images/{fileName} {
+      allow read: if true;
+      allow create, update: if request.auth.token.role == 'admin' && isValidImage(10);
+      allow delete: if request.auth.token.role == 'admin';
+    }
+
+    // Deny everything else
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

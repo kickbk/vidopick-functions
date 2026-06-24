@@ -176,18 +176,6 @@ Automatically sets `role: advertiser` and `advertiserId` custom claims on a Fire
 
 ---
 
-#### `setAdminClaims`
-**Type:** HTTP POST (one-time setup)  
-**Auth:** `ADMIN_SETUP_SECRET` env variable (falls back to `'change-me-in-production'`)
-
-Sets `role: admin` custom claims on a Firebase Auth user by UID. Run once during initial setup.
-
-```json
-POST { "secret": "...", "uid": "firebase-auth-uid" }
-```
-
----
-
 #### `getNextAdBatch`
 **Type:** HTTP POST  
 **Auth:** None (public, called by the mobile app)

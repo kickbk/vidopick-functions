@@ -3,6 +3,9 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+  "storage": {
+    "rules": "storage.rules"
+  },
   "functions": [
     {
       "source": "functions",
@@ -16,6 +19,15 @@
     "public": "public",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+          { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains" },
+          { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+        ]
+      },
       {
         "source": "/.well-known/apple-app-site-association",
         "headers": [{ "key": "Content-Type", "value": "application/json" }]
@@ -38,6 +50,7 @@
     "rewrites": [
       { "source": "/.well-known/*", "destination": "/.well-known/$1" },
       { "source": "/attribute", "function": "attribute" },
+      { "source": "/vp/**", "destination": "/index.html" },
       { "source": "**", "function": "handleDeeplink" }
     ]
   }

@@ -36,8 +36,14 @@ service cloud.firestore {
     // ── users ─────────────────────────────────────────────────────────────────
 
     match /users/{uid} {
-      // Users can read and write their own document
-      allow read, write: if ownsDoc(uid);
+      // Users can read their own document and create it
+      allow read: if ownsDoc(uid);
+      allow create: if ownsDoc(uid);
+      allow delete: if ownsDoc(uid);
+      // Users can update their own document but cannot touch allowSandbox —
+      // that field is admin-only (set via Firebase Console or Admin SDK).
+      allow update: if ownsDoc(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['allowSandbox']);
 
       // Admins can read all user documents
       allow read: if isAdmin();
@@ -67,8 +73,9 @@ service cloud.firestore {
       match /notifications/{notifId} {
         allow read: if ownsDoc(uid);
         allow update: if ownsDoc(uid)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedAt']);
-        allow create, delete: if false;
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['viewedAt', 'actionTaken']);
+        allow delete: if ownsDoc(uid);
+        allow create: if false;
       }
 
       // ── following subcollection (LEGACY — kept for old client versions) ───────
@@ -190,9 +197,17 @@ service cloud.firestore {
     match /organizations/{organizationId} {
       allow read: if true; // public — org name/logo/isActive needed for ad serving in mobile app
       allow write: if isAdmin();
-      // Org accounts can update their own document (Edit Profile, settings, etc.)
-      // but cannot create or delete — those are admin-only operations
-      allow update: if isOrgAccount(organizationId);
+      // Org accounts can update their own document (Edit Profile, settings) but only
+      // a safe set of fields — never billing/cost/sponsorship fields (costs,
+      // isSponsoring, billingActive, stripeCustomerId, billingStartDate, billingStatus,
+      // cancelAtPeriodEnd, cancelAt), which stay admin-only. Unchanged keys aren't in
+      // the diff, so an org save that leaves those fields alone still passes.
+      allow update: if isOrgAccount(organizationId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'logo', 'address', 'phone', 'website', 'email',
+          'roles', 'isActive', 'requiresProfileFollowApproval',
+          'memberCanApproveFollows', 'sponsorshipApprovalRole'
+        ]);
     }
 
     // ── members ───────────────────────────────────────────────────────────────
@@ -204,9 +219,14 @@ service cloud.firestore {
 
       // Members can write their own authUid field (written by EmailSignInAction after sign-in).
       // Also allows re-writing the same uid (idempotent) so resent invite links still work.
+      // Requires a verified token for the member's own email (mirrors the affiliate
+      // claim rule) so an unclaimed member doc can't be hijacked by a signed-in user
+      // who didn't prove ownership of the invited email.
       allow update: if isSignedIn()
         && request.auth.uid == request.resource.data.authUid
         && (resource.data.authUid == null || resource.data.authUid == request.auth.uid)
+        && request.auth.token.email_verified == true
+        && resource.data.email == request.auth.token.email
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authUid']);
 
       allow create: if isAdmin()
@@ -230,38 +250,63 @@ service cloud.firestore {
     // ── shortLinks ────────────────────────────────────────────────────────────
 
     match /shortLinks/{linkId} {
-      allow read: if true;
-      allow write: if isAdmin() || isOrgOrMember(resource.data.params.organizationId);
+      // get-by-id stays public so the app and handleDeeplink can resolve a link the
+      // user already holds. Listing/querying requires auth: it previously let anyone
+      // enumerate the whole collection (e.g. unclaimed member-invite links), which
+      // combined with completeMemberAppSignIn enabled member-account takeover.
+      allow get: if true;
+      allow list: if isSignedIn();
+      // Org members may manage their org's links but can never re-point a link
+      // at a different organization.
+      allow write: if isAdmin()
+        || (isOrgOrMember(resource.data.params.organizationId)
+            && (request.method == 'delete'
+                || request.resource.data.params.organizationId == resource.data.params.organizationId));
     }
 
     // ── invites (shortLinks sub-documents) ────────────────────────────────────
 
     match /invites/{inviteId} {
       allow read: if true;
-      allow write: if isAdmin() || isOrgOrMember(resource.data.organizationId);
+      allow write: if isAdmin()
+        || (isOrgOrMember(resource.data.organizationId)
+            && (request.method == 'delete'
+                || request.resource.data.organizationId == resource.data.organizationId));
     }
 
     // ── deviceSessions ────────────────────────────────────────────────────────
 
     match /deviceSessions/{sessionId} {
       // Device reads its own session while unauthenticated — the random sessionId is the secret.
-      // Writes are cloud-function only (admin SDK bypasses rules).
+      // Writes are cloud-function only (admin SDK bypasses rules), with one exception:
+      // after the device signs in with the session's customToken, it nulls the token
+      // so it can't be read again for the rest of the doc's TTL.
       allow read: if true;
-      allow write: if false;
+      allow update: if isSignedIn()
+        && request.auth.uid == resource.data.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['customToken'])
+        && request.resource.data.customToken == null;
+      allow create, delete: if false;
     }
 
     // ── scannedPlaylists (import tracking) ───────────────────────────────────
 
     match /scannedPlaylists/{docId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      // Content fields (title, isApproved, …) are written only by Cloud Functions
+      // (savePlaylistFromExtension). Clients may only bump the importCount counter.
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['importCount']);
+      allow update: if isSignedIn()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['importCount']);
+      allow delete: if false;
     }
 
     // ── playlistIdIndex ───────────────────────────────────────────────────────
 
     match /playlistIdIndex/{docId} {
       allow read: if true;
-      allow write: if isSignedIn();
+      allow write: if false; // Cloud Functions only
     }
 
     // ── orgSponsors (billing / sponsorship tracking) ─────────────────────────
@@ -281,6 +326,139 @@ service cloud.firestore {
     match /leads/{leadId} {
       allow read, create, update: if request.auth.uid == 'poPjm1Ngw9aKnzcB6HwZSkewB392' || isAdmin();
       allow delete: if isAdmin();
+    }
+
+    // ── sam (conversation history) ────────────────────────────────────────────
+    // Sam app reads/writes its own conversation history. Web admin has read access.
+
+    match /sam/{convId} {
+      allow read, write: if request.auth.uid == 'poPjm1Ngw9aKnzcB6HwZSkewB392' || isAdmin();
+    }
+
+    // ── affiliates ────────────────────────────────────────────────────────────
+    // Used for both ad-network organizations (type: 'organization') and
+    // influencer affiliate partners (type: 'influencer').
+
+    match /affiliates/{affiliateId} {
+      // Admins have full access
+      allow read, write: if isAdmin();
+
+      // Public read for slug pointer docs only. Full affiliate docs are never public —
+      // they hold payout info and internal notes; the public page reads the sanitized
+      // mirror at affiliates/{id}/public/profile instead.
+      // resource == null means the document doesn't exist (slug is available) — allow so
+      // the client can confirm availability without a permission error.
+      allow read: if resource == null || resource.data.type == 'slug';
+
+      // Fast path: matched by authUid (set after first sign-in)
+      allow read: if isSignedIn() && resource.data.authUid == request.auth.uid;
+
+      // First sign-in: authUid is still null — allow read by email.
+      // email_verified is required: token.email exists on unverified password accounts too.
+      // Firestore can verify this constraint for queries using where('email', '==', ...).
+      // Once claimed (authUid set), only the authUid fast path above applies, so a
+      // later registration of the same email can't read someone's claimed account.
+      allow read: if isSignedIn()
+        && resource.data.authUid == null
+        && request.auth.token.email_verified == true
+        && resource.data.email == request.auth.token.email;
+
+      // Affiliate can write authUid on first magic-link sign-in (authUid starts null).
+      // The caller must hold a verified token for the affiliate's own email, and may
+      // only claim the doc for themselves — never write someone else's uid.
+      allow update: if isSignedIn()
+        && (resource.data.authUid == null || resource.data.authUid == request.auth.uid)
+        && request.resource.data.authUid == request.auth.uid
+        && request.auth.token.email_verified == true
+        && resource.data.email == request.auth.token.email
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authUid']);
+
+      // Affiliate can update their own profile fields, payout info, and onboarding state
+      allow update: if isSignedIn()
+        && resource.data.authUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paypalEmail', 'payoutMethod', 'photo', 'bio', 'title', 'name', 'website', 'websiteSummary', 'websiteKeywords', 'onboardingCompletedAt', 'affiliateTermsAgreedAt', 'socialLinks']);
+
+      // publicProfiles subcollection — public read for vidopick.com; created/removed by
+      // Cloud Functions (addPublicProfile/removePublicProfile). The owning affiliate may
+      // edit only the `description` of their own entries; everything else is admin-only.
+      match /publicProfiles/{profileId} {
+        allow read: if true;
+        allow write: if isAdmin();
+        allow update: if isSignedIn()
+          && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['description']);
+      }
+
+      // Sanitized public mirror (name/title/bio/photo/website/slug only), maintained by
+      // the onVpAffiliateWrite trigger. This is what the public /vp/{slug} page reads.
+      match /public/{docId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+
+      // Internal admin notes — never visible to the affiliate or the public.
+      match /private/{docId} {
+        allow read, write: if isAdmin();
+      }
+
+      // Generated copy history — one doc per generation, affiliate owns their own.
+      match /generatedCopy/{copyId} {
+        allow read, write: if isAdmin();
+        allow read, create: if isSignedIn()
+          && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == request.auth.uid;
+        allow update: if isSignedIn()
+          && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['variations', 'savedAt']);
+        allow delete: if isSignedIn()
+          && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == request.auth.uid;
+      }
+
+      // AI copywriting instructions — affiliate manages their own.
+      match /instructions/{instructionId} {
+        allow read, write: if isAdmin();
+        allow read: if isSignedIn()
+          && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == request.auth.uid;
+        allow create: if isSignedIn()
+          && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['title', 'description', 'createdAt']);
+        allow update: if isSignedIn()
+          && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description']);
+        allow delete: if isSignedIn()
+          && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == request.auth.uid;
+      }
+
+      // Commissions subcollection — affiliate reads their own; only Cloud Functions write.
+      // Two rules cover the same user: fast path (authUid) and email fallback for the
+      // first-sign-in window before authUid is written (verified emails only).
+      // get() is cached per document read.
+      match /commissions/{commissionId} {
+        allow read: if isAdmin();
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == request.auth.uid
+          || (request.auth.token.email_verified == true
+              && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == null
+              && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.email == request.auth.token.email)
+        );
+      }
+
+      match /dailyStats/{dateId} {
+        allow read: if isAdmin();
+        allow read: if isSignedIn() && (
+          get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == request.auth.uid
+          || (request.auth.token.email_verified == true
+              && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == null
+              && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.email == request.auth.token.email)
+        );
+      }
+    }
+
+    // ── outreach_affiliates ───────────────────────────────────────────────────
+    // Admin-only. Cloud Functions (resendOutreachWebhook, sendAffiliateOutreachEmail)
+    // use Admin SDK and bypass these rules.
+
+    match /outreach_affiliates/{leadId} {
+      allow read, write: if isAdmin();
     }
 
     // ── Deny everything else ──────────────────────────────────────────────────
