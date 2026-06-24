@@ -40,22 +40,46 @@ export const savePlaylistFromExtension = onRequest(
     }
 
     // 3. SECURITY: Validate Data Structure
-    if (!playlistData || !playlistData.id) {
+    if (!playlistData || typeof playlistData !== 'object' || !playlistData.id) {
       response.status(400).json({ error: 'Missing playlist data or ID' });
       return;
     }
 
+    if (typeof playlistData.id !== 'string' || !/^[A-Za-z0-9_-]{10,60}$/.test(playlistData.id)) {
+      response.status(400).json({ error: 'Invalid playlist ID' });
+      return;
+    }
+
+    // 4. SECURITY: Field allowlist — the shared API key ships inside the Chrome
+    // extension, so treat the payload as untrusted and only accept known fields.
+    const ALLOWED_FIELDS = [
+      'id', 'title', 'thumbnail', 'author', 'authorUrl', 'ageMin', 'ageMax',
+      'tags', 'category', 'categories', 'languages', 'description', 'sourceUrl',
+      'ranking', 'channelSubscribers', 'channelVerified', 'isAppropriate',
+      'reviewedBy', 'reviewedAt', 'scannedAt', 'updatedAt', 'scannedBy', 'likes',
+    ];
+    const cleanedData: Record<string, unknown> = {};
+    for (const field of ALLOWED_FIELDS) {
+      if (field in playlistData) cleanedData[field] = playlistData[field];
+    }
+    if (typeof cleanedData.title !== 'string' || cleanedData.title.length > 500) {
+      response.status(400).json({ error: 'Invalid title' });
+      return;
+    }
+
     try {
-      const playlistId = playlistData.id;
+      const playlistId = playlistData.id as string;
 
       // Check if already in scannedPlaylists (previously scanned by a user — isApproved: false).
       // If so, merge the existing AI data with the extension-provided data so we don't lose it.
+      // Note: importCount is intentionally NOT accepted from the payload — the extension
+      // sends 0, which would clobber the real counter on re-save.
       const existingSnap = await db.collection('scannedPlaylists').doc(playlistId).get();
       const existingData = existingSnap.exists ? existingSnap.data() : null;
 
       const dataToSave = existingData
-        ? { ...existingData, ...playlistData, isApproved: true }
-        : { ...playlistData, isApproved: true };
+        ? { ...existingData, ...cleanedData, isApproved: true }
+        : { ...cleanedData, importCount: 0, isApproved: true };
 
       await db.collection('scannedPlaylists').doc(playlistId).set(dataToSave, { merge: true });
 
@@ -63,10 +87,7 @@ export const savePlaylistFromExtension = onRequest(
       response.status(200).json({ success: true, id: playlistId });
     } catch (error: any) {
       console.error('Error saving playlist:', error);
-      response.status(500).json({
-        error: 'Failed to save playlist',
-        details: error?.message,
-      });
+      response.status(500).json({ error: 'Failed to save playlist' });
     }
   }
 );

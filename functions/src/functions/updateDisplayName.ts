@@ -21,7 +21,7 @@ export const updateDisplayName = onCall(async (request) => {
   const uid = request.auth.uid;
   const db = admin.firestore();
 
-  await db.doc(`users/${uid}`).set({ displayName: trimmed }, { merge: true });
+  await db.doc(`users/${uid}`).set({ name: trimmed }, { merge: true });
 
   const shortLinksSnap = await db.collection('shortLinks').where('createdBy', '==', uid).get();
 

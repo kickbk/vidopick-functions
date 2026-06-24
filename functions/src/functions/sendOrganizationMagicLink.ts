@@ -15,17 +15,20 @@ if (!admin.apps.length) {
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const TURNSTILE_SECRET_KEY = process.env.TURNSTILE_SECRET_KEY;
 
+// Fail-closed Turnstile verification. A failed or missing verification rejects
+// the request; transient errors reaching Cloudflare surface as 'unavailable' so
+// the client retries instead of silently bypassing the CAPTCHA.
 function verifyTurnstile(token: string): Promise<boolean> {
   if (!TURNSTILE_SECRET_KEY) {
-    console.warn('[Turnstile] Secret key not configured — skipping verification');
-    return Promise.resolve(true);
+    console.error('[Turnstile] Secret key not configured — rejecting (set TURNSTILE_SECRET_KEY)');
+    throw new HttpsError('internal', 'Verification service misconfigured');
   }
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const body = JSON.stringify({ secret: TURNSTILE_SECRET_KEY, response: token });
     const req = https.request(
       {
         hostname: 'challenges.cloudflare.com',
-        path: '/turnstile/v1/siteverify',
+        path: '/turnstile/v0/siteverify',
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -43,17 +46,17 @@ function verifyTurnstile(token: string): Promise<boolean> {
             const data = JSON.parse(raw) as { success: boolean };
             resolve(data.success === true);
           } catch {
-            // Cloudflare returned a non-JSON response (e.g. WAF block from cloud IP).
-            // Fail open — the client-side widget already passed.
-            console.warn('[Turnstile] Non-JSON response from siteverify — failing open');
-            resolve(true);
+            // Non-JSON response (e.g. WAF block from cloud IP) — treat as a
+            // service problem the client can retry, not a free pass.
+            console.error('[Turnstile] Non-JSON response from siteverify');
+            reject(new HttpsError('unavailable', 'Verification service unavailable. Please try again.'));
           }
         });
       }
     );
     req.on('error', (e) => {
-      console.warn('[Turnstile] Network error contacting siteverify — failing open:', e.message);
-      resolve(true);
+      console.error('[Turnstile] Network error contacting siteverify:', e.message);
+      reject(new HttpsError('unavailable', 'Verification service unavailable. Please try again.'));
     });
     req.write(body);
     req.end();

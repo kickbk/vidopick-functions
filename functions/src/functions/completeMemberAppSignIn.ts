@@ -79,7 +79,6 @@ export const completeMemberAppSignIn = onCall(async (request) => {
     if (err.code === 'auth/user-not-found') {
       const created = await admin.auth().createUser({
         email,
-        displayName: memberName ?? '',
         emailVerified: false,
       });
       uid = created.uid;
@@ -101,7 +100,7 @@ export const completeMemberAppSignIn = onCall(async (request) => {
       proStatus: 'active',
       proType: 'sponsored',
       orgMemberId: memberId,
-      memberName: memberName ?? '',
+      name: memberName ?? '',
       orgName: orgName ?? '',
     },
     { merge: true }

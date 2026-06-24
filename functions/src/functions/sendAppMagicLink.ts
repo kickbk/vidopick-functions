@@ -3,6 +3,7 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { Resend } from 'resend';
 
 import { buildAppMagicLinkEmail } from '../utils/emailTemplates';
+import { checkRateLimit, requestIp } from '../utils/rateLimit';
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -52,6 +53,18 @@ export const sendAppMagicLink = onRequest(
     if (!RESEND_API_KEY) {
       console.error('RESEND_API_KEY not configured');
       res.status(500).json({ error: 'Email configuration missing' });
+      return;
+    }
+
+    // Public endpoint that emails arbitrary addresses — cap volume per IP
+    // and per target address.
+    const ip = requestIp(req);
+    const [ipAllowed, emailAllowed] = await Promise.all([
+      checkRateLimit(`magiclink_ip_${ip}`, 10),
+      checkRateLimit(`magiclink_email_${email.toLowerCase()}`, 5),
+    ]);
+    if (!ipAllowed || !emailAllowed) {
+      res.status(429).json({ error: 'Too many requests. Please try again later.' });
       return;
     }
 

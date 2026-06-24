@@ -215,6 +215,25 @@ export const refreshPlaylistMetadata = onRequest(
       return;
     }
 
+    // Admin-only: this is a maintenance endpoint that calls the YouTube API and
+    // writes/removes scannedPlaylists docs. No app/web client calls it; require a
+    // Firebase ID token with the admin claim so it can't be hit anonymously.
+    const authHeader = request.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      response.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+    try {
+      const decoded = await admin.auth().verifyIdToken(authHeader.split('Bearer ')[1]);
+      if (decoded.role !== 'admin') {
+        response.status(403).json({ error: 'Forbidden' });
+        return;
+      }
+    } catch {
+      response.status(401).json({ error: 'Invalid token' });
+      return;
+    }
+
     const { playlistIds } = request.body as { playlistIds: string[] };
 
     // Validate input

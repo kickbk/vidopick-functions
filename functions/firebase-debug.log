@@ -1,0 +1,163 @@
+[debug] [2026-06-23T21:26:52.983Z] ----------------------------------------------------------------------
+[debug] [2026-06-23T21:26:52.984Z] Command:       /opt/homebrew/Cellar/node/24.4.0/bin/node /opt/homebrew/bin/firebase deploy --only functions:generateVpProfile
+[debug] [2026-06-23T21:26:52.984Z] CLI Version:   14.11.2
+[debug] [2026-06-23T21:26:52.984Z] Platform:      darwin
+[debug] [2026-06-23T21:26:52.984Z] Node Version:  v24.4.0
+[debug] [2026-06-23T21:26:52.984Z] Time:          Tue Jun 23 2026 14:26:52 GMT-0700 (Pacific Daylight Time)
+[debug] [2026-06-23T21:26:52.984Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-06-23T21:26:53.074Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-06-23T21:26:53.074Z] > authorizing via signed-in user (benkass@gmail.com)
+[debug] [2026-06-23T21:26:53.074Z] [iam] checking project vidopick-c725d for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2026-06-23T21:26:53.075Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:53.075Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:53.075Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/vidopick-c725d:testIamPermissions [none]
+[debug] [2026-06-23T21:26:53.075Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/vidopick-c725d:testIamPermissions x-goog-quota-user=projects/vidopick-c725d
+[debug] [2026-06-23T21:26:53.075Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/vidopick-c725d:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-06-23T21:26:53.377Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/vidopick-c725d:testIamPermissions 200
+[debug] [2026-06-23T21:26:53.377Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/vidopick-c725d:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2026-06-23T21:26:53.377Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:53.377Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:53.377Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/vidopick-c725d/serviceAccounts/vidopick-c725d@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2026-06-23T21:26:53.377Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/vidopick-c725d/serviceAccounts/vidopick-c725d@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2026-06-23T21:26:53.711Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/vidopick-c725d/serviceAccounts/vidopick-c725d@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2026-06-23T21:26:53.711Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/vidopick-c725d/serviceAccounts/vidopick-c725d@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'vidopick-c725d'...
+[info] 
+[info] i  deploying functions 
+[info] Running command: npm --prefix "$RESOURCE_DIR" run build
+[info] ✔  functions: Finished running predeploy script. 
+[debug] [2026-06-23T21:26:58.020Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.020Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.020Z] >>> [apiv2][query] GET https://cloudresourcemanager.googleapis.com/v1/projects/vidopick-c725d [none]
+[debug] [2026-06-23T21:26:58.138Z] <<< [apiv2][status] GET https://cloudresourcemanager.googleapis.com/v1/projects/vidopick-c725d 200
+[debug] [2026-06-23T21:26:58.138Z] <<< [apiv2][body] GET https://cloudresourcemanager.googleapis.com/v1/projects/vidopick-c725d {"projectNumber":"670330462636","projectId":"vidopick-c725d","lifecycleState":"ACTIVE","name":"Vidopick","labels":{"firebase":"enabled","firebase-core":"disabled"},"createTime":"2025-08-05T05:27:38.256104Z"}
+[info] i  functions: preparing codebase default for deployment 
+[info] i  functions: ensuring required API cloudfunctions.googleapis.com is enabled... 
+[info] i  functions: ensuring required API cloudbuild.googleapis.com is enabled... 
+[info] i  artifactregistry: ensuring required API artifactregistry.googleapis.com is enabled... 
+[debug] [2026-06-23T21:26:58.139Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.139Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.139Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/vidopick-c725d/adminSdkConfig [none]
+[debug] [2026-06-23T21:26:58.413Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/vidopick-c725d/adminSdkConfig 200
+[debug] [2026-06-23T21:26:58.413Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/vidopick-c725d/adminSdkConfig {"projectId":"vidopick-c725d","storageBucket":"vidopick-c725d.firebasestorage.app"}
+[debug] [2026-06-23T21:26:58.413Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.414Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.414Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs [none]
+[debug] [2026-06-23T21:26:58.609Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs 200
+[debug] [2026-06-23T21:26:58.609Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs {"configs":[{"name":"projects/vidopick-c725d/configs/smtp"},{"name":"projects/vidopick-c725d/configs/recaptcha"}]}
+[debug] [2026-06-23T21:26:58.610Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.610Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.610Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.610Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.610Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables [none]
+[debug] [2026-06-23T21:26:58.611Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/recaptcha/variables [none]
+[debug] [2026-06-23T21:26:58.742Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables 200
+[debug] [2026-06-23T21:26:58.743Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables {"variables":[{"name":"projects/vidopick-c725d/configs/smtp/variables/host","updateTime":"2025-08-05T05:55:12.474632134Z"},{"name":"projects/vidopick-c725d/configs/smtp/variables/pass","updateTime":"2025-08-05T05:55:08.743317293Z"},{"name":"projects/vidopick-c725d/configs/smtp/variables/port","updateTime":"2025-08-05T05:55:09.411366035Z"},{"name":"projects/vidopick-c725d/configs/smtp/variables/to","updateTime":"2025-08-05T05:55:11.444780913Z"},{"name":"projects/vidopick-c725d/configs/smtp/variables/user","updateTime":"2025-08-05T05:55:10.416704041Z"}]}
+[debug] [2026-06-23T21:26:58.743Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.743Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.743Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.743Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.744Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.744Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.744Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.744Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.744Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.744Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.744Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/host [none]
+[debug] [2026-06-23T21:26:58.745Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/pass [none]
+[debug] [2026-06-23T21:26:58.748Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/port [none]
+[debug] [2026-06-23T21:26:58.756Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/to [none]
+[debug] [2026-06-23T21:26:58.758Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/user [none]
+[debug] [2026-06-23T21:26:58.801Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/recaptcha/variables 200
+[debug] [2026-06-23T21:26:58.802Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/recaptcha/variables {"variables":[{"name":"projects/vidopick-c725d/configs/recaptcha/variables/min_score","updateTime":"2025-08-05T05:55:09.378465582Z"},{"name":"projects/vidopick-c725d/configs/recaptcha/variables/secret","updateTime":"2025-08-05T05:55:08.772052337Z"}]}
+[debug] [2026-06-23T21:26:58.802Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.802Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.802Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.802Z] Checked if tokens are valid: true, expires at: 1782251974666
+[debug] [2026-06-23T21:26:58.803Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/recaptcha/variables/min_score [none]
+[debug] [2026-06-23T21:26:58.804Z] >>> [apiv2][query] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/recaptcha/variables/secret [none]
+[debug] [2026-06-23T21:26:58.916Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/host 200
+[debug] [2026-06-23T21:26:58.917Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/host {"name":"projects/vidopick-c725d/configs/smtp/variables/host","updateTime":"2025-08-05T05:55:12.474632134Z","text":"smtp.gmail.com"}
+[debug] [2026-06-23T21:26:58.953Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/recaptcha/variables/min_score 200
+[debug] [2026-06-23T21:26:58.954Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/recaptcha/variables/min_score {"name":"projects/vidopick-c725d/configs/recaptcha/variables/min_score","updateTime":"2025-08-05T05:55:09.378465582Z","text":"0.5"}
+[debug] [2026-06-23T21:26:58.957Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/pass 200
+[debug] [2026-06-23T21:26:58.957Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/pass {"name":"projects/vidopick-c725d/configs/smtp/variables/pass","updateTime":"2025-08-05T05:55:08.743317293Z","text":"D#nv1AP7"}
+[debug] [2026-06-23T21:26:58.957Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/port 200
+[debug] [2026-06-23T21:26:58.957Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/port {"name":"projects/vidopick-c725d/configs/smtp/variables/port","updateTime":"2025-08-05T05:55:09.411366035Z","text":"587"}
+[debug] [2026-06-23T21:26:58.990Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/to 200
+[debug] [2026-06-23T21:26:58.991Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/to {"name":"projects/vidopick-c725d/configs/smtp/variables/to","updateTime":"2025-08-05T05:55:11.444780913Z","text":"vidopickhelp@gmail.com"}
+[debug] [2026-06-23T21:26:59.034Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/recaptcha/variables/secret 200
+[debug] [2026-06-23T21:26:59.034Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/recaptcha/variables/secret {"name":"projects/vidopick-c725d/configs/recaptcha/variables/secret","updateTime":"2025-08-05T05:55:08.772052337Z","text":"6Le86porAAAAAA1AdiwEjc_tLGG1CoJ3YXxgRlsx"}
+[debug] [2026-06-23T21:26:59.096Z] <<< [apiv2][status] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/user 200
+[debug] [2026-06-23T21:26:59.097Z] <<< [apiv2][body] GET https://runtimeconfig.googleapis.com/v1beta1/projects/vidopick-c725d/configs/smtp/variables/user {"name":"projects/vidopick-c725d/configs/smtp/variables/user","updateTime":"2025-08-05T05:55:10.416704041Z","text":"vidopickhelp@gmail.com"}
+[debug] [2026-06-23T21:26:59.112Z] Validating nodejs source
+[warn] ⚠  functions: package.json indicates an outdated version of firebase-functions. Please upgrade using npm install --save firebase-functions@latest in your functions directory. 
+[warn] ⚠  functions: Please note that there will be breaking changes when you upgrade. 
+[debug] [2026-06-23T21:26:59.564Z] > [functions] package.json contents: {
+  "name": "functions",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "deployFirestoreRules": "firebase deploy --only firestore:rules",
+    "deployFirebaseHosting": "firebase deploy --only hosting",
+    "logs": "firebase functions:log",
+    "createInvite": "node scripts/createInvite.mjs",
+    "migrateShortLinksPlaylists": "node scripts/migrateShortLinksPlaylists.mjs",
+    "discoverPlaylists": "node scripts/discoverPlaylists.mjs",
+    "validatePlaylists": "node scripts/validatePlaylists.mjs",
+    "fix": "node scripts/fix.mjs",
+    "createAdminUser": "node scripts/createAdminUser.mjs",
+    "migrateDemoEmail": "node scripts/migrateDemoEmail.mjs",
+    "migrateLanguages": "node scripts/migrateLanguages.mjs",
+    "migrateCategories": "node scripts/migrateCategories.mjs",
+    "migrateToRootProfiles": "node scripts/migrateToRootProfiles.mjs",
+    "migrateNameField": "node scripts/migrateNameField.mjs",
+    "migrateAffiliateShortlinkNames": "node scripts/migrateAffiliateShortlinkNames.mjs",
+    "importLeads": "node scripts/importLeads.mjs",
+    "compressOrgLogos": "node scripts/compressOrgLogos.mjs",
+    "syncAlgolia": "node lib/functions/syncAlgolia.js",
+    "testDL": "adb shell am start -a android.intent.action.VIEW -d 'https://vpk.to/momomop'"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "lib/index.js",
+  "dependencies": {
+    "@google-cloud/storage": "^7.18.0",
+    "algoliasearch": "^5.42.0",
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^6.0.1",
+    "nanoid": "^5.1.5",
+    "nodemailer": "^8.0.7",
+    "openai": "^4.20.0",
+    "puppeteer": "^25.2.0",
+    "qrcode": "^1.5.4",
+    "react-qr-code": "^2.0.18",
+    "resend": "^6.10.0",
+    "satori": "^0.26.0",
+    "sharp": "^0.34.5",
+    "stripe": "^22.0.2",
+    "svix": "^1.96.0"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^8.0.0",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.14",
+    "firebase-functions-test": "^3.1.0",
+    "typescript": "^5.7.3"
+  },
+  "private": true
+}
+[debug] [2026-06-23T21:26:59.564Z] Building nodejs source
+[info] i  functions: Loading and analyzing source code for codebase default to determine what to deploy 
+[debug] [2026-06-23T21:26:59.565Z] Could not find functions.yaml. Must use http discovery
+[debug] [2026-06-23T21:26:59.571Z] Found firebase-functions binary at '/Users/benkass/Developer/Vidopick/firebase/functions/node_modules/.bin/firebase-functions'

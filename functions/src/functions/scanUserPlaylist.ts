@@ -28,6 +28,8 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { Resend } from 'resend';
 import axios from 'axios';
 
+import { checkRateLimit } from '../utils/rateLimit';
+
 if (!admin.apps.length) {
   admin.initializeApp();
 }
@@ -252,6 +254,12 @@ export const scanUserPlaylist = onRequest(
       return;
     }
 
+    // Each new scan costs an OpenAI + YouTube API call — cap per-user volume.
+    if (!(await checkRateLimit(`scan_${uid}`, 20))) {
+      res.status(429).json({ error: 'Too many scans. Please try again later.' });
+      return;
+    }
+
     console.log(`[scanUserPlaylist] uid=${uid} playlistId=${playlistId}`);
 
     try {
@@ -386,7 +394,9 @@ IMPORTANT for languages: always return an array. Rules: (1) Explicit labels like
       console.log(`[scanUserPlaylist] saved to scannedPlaylists status=${result.status}`);
 
       // Fire-and-forget moderation email
-      sendModerationEmail(result).catch(() => {});
+      sendModerationEmail(result).catch((e) =>
+        console.warn('[scanUserPlaylist] moderation email failed:', e)
+      );
 
       res.status(200).json({ source: 'new', ...result });
     } catch (error: any) {

@@ -501,10 +501,11 @@ export const requestOrgSponsorship = onCall(
             const memberTokens: string[] = memberUserSnap.data()?.deviceTokens ?? [];
             const profileName: string = profileSnapshots[0]?.profileName ?? 'your profile';
             const notifTitle = 'New sponsorship request';
-            const notifBody = `${displayName} wants to follow ${profileName}. Approve by tapping on ${profileName} and open Followers, or use the dashboard on the Vidopick website.`;
+            const notifBody = `${displayName} wants to follow ${profileName}.`;
 
             await notifyUser(db, memberAuthUid, memberTokens, notifTitle, notifBody, {
               type: 'new_follower_request',
+              requestId: sponsorshipRef.id,
             });
           }
         }
@@ -817,6 +818,10 @@ export const requestProfileFollow = onCall(
     const db = admin.firestore();
     const requestingUid = request.auth.uid;
 
+    if (requestingUid === profileOwnerUid) {
+      return { success: true, status: 'own_profile' };
+    }
+
     // Verify the requesting user has an active Pro account
     const requesterSnap = await db.doc(`users/${requestingUid}`).get();
     const requesterProStatus = requesterSnap.data()?.proStatus;
@@ -1054,10 +1059,11 @@ export const unfollowProfile = onCall(
       [`profiles.${profileId}`]: admin.firestore.FieldValue.delete(),
     });
 
-    // Remove follower from the profile's followerUids
+    // Remove follower from the profile's followerUids (and deactivatedFollowerUids if lapsed)
     try {
       await db.doc(`profiles/${profileId}`).update({
         followerUids: admin.firestore.FieldValue.arrayRemove(uid),
+        deactivatedFollowerUids: admin.firestore.FieldValue.arrayRemove(uid),
       });
     } catch (e) {
       console.warn('[unfollowProfile] followerUids cleanup failed:', e);
@@ -1253,10 +1259,11 @@ export const removeProfileFollower = onCall(
       [`profiles.${profileId}`]: admin.firestore.FieldValue.delete(),
     });
 
-    // Remove uid from the profile's followerUids
+    // Remove uid from the profile's followerUids (and deactivatedFollowerUids if lapsed)
     try {
       await db.doc(`profiles/${profileId}`).update({
         followerUids: admin.firestore.FieldValue.arrayRemove(requestingUid),
+        deactivatedFollowerUids: admin.firestore.FieldValue.arrayRemove(requestingUid),
       });
     } catch (e) {
       console.warn('[removeProfileFollower] followerUids cleanup failed:', e);
@@ -1341,11 +1348,12 @@ export const revokeProfileFollower = onCall(
       }
       await db.doc(`users/${uid}`).update(mapUpdates);
 
-      // Remove uid from each profile's followerUids
+      // Remove uid from each profile's followerUids (and deactivatedFollowerUids if lapsed)
       const followerBatch = db.batch();
       for (const pid of orgProfileIds) {
         followerBatch.update(db.doc(`profiles/${pid}`), {
           followerUids: admin.firestore.FieldValue.arrayRemove(uid),
+          deactivatedFollowerUids: admin.firestore.FieldValue.arrayRemove(uid),
         });
       }
       await followerBatch.commit();
@@ -1441,7 +1449,7 @@ export const listProfileFollowers = onCall(
           const data = userSnap.data() ?? {};
           return {
             uid,
-            displayName: (data.displayName as string) ?? '',
+            displayName: (data.name as string) ?? (data.displayName as string) ?? '',
             email: (data.email as string) ?? '',
           };
         } catch {
@@ -1478,6 +1486,7 @@ export const removeProfileFollowerDirect = onCall(
 
     await db.doc(`profiles/${profileId}`).update({
       followerUids: admin.firestore.FieldValue.arrayRemove(followerUid),
+      deactivatedFollowerUids: admin.firestore.FieldValue.arrayRemove(followerUid),
     });
 
     await db.doc(`users/${followerUid}`).update({

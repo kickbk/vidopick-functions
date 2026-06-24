@@ -39,7 +39,7 @@ export const setMemberClaims = onDocumentUpdated('members/{memberId}', async (ev
         proStatus: 'active',
         proType: 'sponsored',
         orgMemberId: memberId,
-        memberName,
+        name: memberName,
       },
       { merge: true }
     );

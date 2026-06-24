@@ -1,3 +1,12 @@
+function esc(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const FONT_FACE = `
   @font-face {
     font-family: 'Vidopick';
@@ -27,7 +36,7 @@ export function buildMemberInviteEmail(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${orgName} invites you to Vidopick</title>
+  <title>${esc(orgName)} invites you to Vidopick</title>
   <style>${FONT_FACE}</style>
 </head>
 <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
@@ -43,13 +52,13 @@ export function buildMemberInviteEmail(
 
         <tr>
           <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
-            <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">${orgName} invites you to Vidopick</h1>
-            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${memberName},</p>
+            <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">${esc(orgName)} invites you to Vidopick</h1>
+            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${esc(memberName)},</p>
             <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7;">
-              Vidopick is a child-safe video player with parental controls. Parents use it to select safe, curated playlists for their children, free from unwanted and unapproved content. Organizations like <strong>${orgName}</strong> can share their own recommended playlists directly through the app.
+              Vidopick is a child-safe video player with parental controls. Parents use it to select safe, curated playlists for their children, free from unwanted and unapproved content. Organizations like <strong>${esc(orgName)}</strong> can share their own recommended playlists directly through the app.
             </p>
             <p style="margin:0 0 36px;font-size:15px;color:#334155;line-height:1.7;">
-              As a staff member for <strong>${orgName}</strong>, you'll have access to the dashboard where you can create invite links with optionally embedded video playlists to share with families in your community.${proLine}
+              As a staff member for <strong>${esc(orgName)}</strong>, you'll have access to the dashboard where you can create invite links with optionally embedded video playlists to share with families in your community.${proLine}
             </p>
 
             <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 36px;">
@@ -67,7 +76,7 @@ export function buildMemberInviteEmail(
 
             <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
               This link expires in 24 hours. If you weren't expecting this, you can safely ignore this email.
-              For questions about your role, reach out to <strong>${orgName}</strong> directly. For help with Vidopick, visit
+              For questions about your role, reach out to <strong>${esc(orgName)}</strong> directly. For help with Vidopick, visit
               <a href="https://vidopick.com/contact/" style="color:#94a3b8;">vidopick.com/contact</a>.
             </p>
           </td>
@@ -116,7 +125,7 @@ export function buildInviteEmail(organizationName: string, signInLink: string): 
         <tr>
           <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
             <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">Welcome to Vidopick</h1>
-            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${organizationName},</p>
+            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${esc(organizationName)},</p>
             <p style="margin:0 0 36px;font-size:15px;color:#334155;line-height:1.7;">
               Your organization account on Vidopick is ready. Click the button below to access your dashboard and start managing your campaigns.
             </p>
@@ -185,7 +194,7 @@ export function buildDemoAccessEmail(recipientEmail: string, signInLink: string)
               Here's your one-click link to explore the Vidopick organization dashboard. You'll see a live demo account with real data.
             </p>
             <p style="margin:0 0 36px;font-size:14px;color:#64748b;line-height:1.6;">
-              The demo session lasts 15 minutes and is exclusive — only one person can use it at a time.
+              The demo session lasts 15 minutes and is exclusive. Only one person can use it at a time.
             </p>
 
             <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 36px;">
@@ -202,8 +211,152 @@ export function buildDemoAccessEmail(recipientEmail: string, signInLink: string)
             <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 24px;" />
 
             <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
-              This link expires in 1 hour. Sent to ${recipientEmail} at your request.
+              This link expires in 1 hour. Sent to ${esc(recipientEmail)} at your request.
               If you didn't request this, you can safely ignore this email.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding-top:24px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              &copy; ${year} Vidopick &middot;
+              <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function buildEmailChangeNotificationEmail(
+  oldEmail: string,
+  newEmail: string,
+  revertLink: string
+): string {
+  const year = new Date().getFullYear();
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your Vidopick email address was changed</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+
+        <tr>
+          <td style="padding-bottom:32px;text-align:center;">
+            <span style="${LOGO_STYLE}">Vidopick</span>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
+            <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">Your email address was changed</h1>
+            <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7;">
+              The email address on your Vidopick account was updated from
+              <strong>${esc(oldEmail)}</strong> to <strong>${esc(newEmail)}</strong>.
+            </p>
+            <p style="margin:0 0 32px;font-size:15px;color:#334155;line-height:1.7;">
+              If you made this change, you don't need to do anything. If you didn't, tap the button
+              below to revert to <strong>${esc(oldEmail)}</strong> immediately.
+            </p>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 32px;">
+              <tr>
+                <td style="background-color:#dc2626;border-radius:10px;">
+                  <a href="${revertLink}"
+                     style="display:inline-block;padding:15px 36px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.01em;white-space:nowrap;">
+                    Revert email change &rarr;
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px;" />
+
+            <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
+              This revert link expires in 7 days. After that, contact us at
+              <a href="mailto:vidopickhelp@gmail.com" style="color:#94a3b8;">vidopickhelp@gmail.com</a>
+              if you need help recovering your account.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding-top:24px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              &copy; ${year} Vidopick &middot;
+              <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function buildEmailUpdateEmail(
+  currentEmail: string,
+  newEmail: string,
+  verifyLink: string
+): string {
+  const year = new Date().getFullYear();
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Confirm your new Vidopick email address</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+
+        <tr>
+          <td style="padding-bottom:32px;text-align:center;">
+            <span style="${LOGO_STYLE}">Vidopick</span>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
+            <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">Confirm your new email address</h1>
+            <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7;">
+              You asked to change your Vidopick email from
+              <strong>${esc(currentEmail)}</strong> to
+              <strong>${esc(newEmail)}</strong>.
+              Tap the button below to confirm — your address won't change until you do.
+            </p>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 32px;">
+              <tr>
+                <td style="background-color:#1d4ed8;border-radius:10px;">
+                  <a href="${verifyLink}"
+                     style="display:inline-block;padding:15px 36px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.01em;white-space:nowrap;">
+                    Confirm new email &rarr;
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px;" />
+
+            <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
+              This link expires in 1 hour. If you didn't request this change, you can safely ignore this email — your address will stay as <strong>${esc(currentEmail)}</strong>.
             </p>
           </td>
         </tr>
@@ -300,14 +453,14 @@ export function buildMemberSubscriberNotificationEmail(
 ): string {
   const year = new Date().getFullYear();
   const emailLine = subscriberEmail
-    ? `<p style="margin:0 0 36px;font-size:14px;color:#64748b;line-height:1.6;">Their email: <strong>${subscriberEmail}</strong></p>`
+    ? `<p style="margin:0 0 36px;font-size:14px;color:#64748b;line-height:1.6;">Their email: <strong>${esc(subscriberEmail)}</strong></p>`
     : '';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>New Pro request for ${organizationName}</title>
+  <title>New Pro request for ${esc(organizationName)}</title>
   <style>${FONT_FACE}</style>
 </head>
 <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
@@ -324,9 +477,9 @@ export function buildMemberSubscriberNotificationEmail(
         <tr>
           <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
             <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">New Pro request</h1>
-            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${memberName},</p>
+            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${esc(memberName)},</p>
             <p style="margin:0 0 8px;font-size:15px;color:#334155;line-height:1.7;">
-              <strong>${subscriberName}</strong> has requested a Pro account sponsored by ${organizationName}. Visit your dashboard to approve or decline their request.
+              <strong>${esc(subscriberName)}</strong> has requested a Pro account sponsored by ${esc(organizationName)}. Visit your dashboard to approve or decline their request.
             </p>
             ${emailLine}
 
@@ -344,7 +497,7 @@ export function buildMemberSubscriberNotificationEmail(
             <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 24px;" />
 
             <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
-              You received this email because you manage an invite for ${organizationName} on Vidopick.
+              You received this email because you manage an invite for ${esc(organizationName)} on Vidopick.
             </p>
           </td>
         </tr>
@@ -373,14 +526,14 @@ export function buildOrgSubscriberNotificationEmail(
 ): string {
   const year = new Date().getFullYear();
   const emailLine = subscriberEmail
-    ? `<p style="margin:0 0 36px;font-size:14px;color:#64748b;line-height:1.6;">Their email: <strong>${subscriberEmail}</strong></p>`
+    ? `<p style="margin:0 0 36px;font-size:14px;color:#64748b;line-height:1.6;">Their email: <strong>${esc(subscriberEmail)}</strong></p>`
     : '';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>New Pro request for ${orgName}</title>
+  <title>New Pro request for ${esc(orgName)}</title>
   <style>${FONT_FACE}</style>
 </head>
 <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
@@ -398,7 +551,7 @@ export function buildOrgSubscriberNotificationEmail(
           <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
             <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">New Pro request</h1>
             <p style="margin:0 0 8px;font-size:15px;color:#334155;line-height:1.7;">
-              <strong>${subscriberName}</strong> has requested a sponsored Pro account from ${orgName} on Vidopick. Visit your dashboard to approve or decline.
+              <strong>${esc(subscriberName)}</strong> has requested a sponsored Pro account from ${esc(orgName)} on Vidopick. Visit your dashboard to approve or decline.
             </p>
             ${emailLine}
 
@@ -516,7 +669,7 @@ export function buildProApprovalEmail(displayName: string, orgName: string): str
 
             <!-- Subtitle -->
             <p style="margin:0;font-size:15px;font-weight:600;color:#fe9e32;letter-spacing:0.5px;">
-              &#10022;&nbsp; Sponsored by ${orgName} &nbsp;&#10022;
+              &#10022;&nbsp; Sponsored by ${esc(orgName)} &nbsp;&#10022;
             </p>
 
           </td>
@@ -526,7 +679,7 @@ export function buildProApprovalEmail(displayName: string, orgName: string): str
         <tr>
           <td style="background:#ffffff;border-radius:0 0 20px 20px;padding:36px 40px 40px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.10);">
 
-            <p style="margin:0 0 6px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${displayName},</p>
+            <p style="margin:0 0 6px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${esc(displayName)},</p>
             <p style="margin:0 0 28px;font-size:15px;color:#334155;line-height:1.7;">
               Welcome to Vidopick Pro! Here's everything you can now do:
             </p>
@@ -600,9 +753,9 @@ export function buildProDeclinedEmail(displayName: string, orgName: string): str
         <tr>
           <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
             <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">Request not approved</h1>
-            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${displayName},</p>
+            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${esc(displayName)},</p>
             <p style="margin:0 0 36px;font-size:15px;color:#334155;line-height:1.7;">
-              <strong>${orgName}</strong> wasn't able to approve your Vidopick Pro request at this time. You can scan their invite link again to re-apply, or get Pro directly from the app.
+              <strong>${esc(orgName)}</strong> wasn't able to approve your Vidopick Pro request at this time. You can scan their invite link again to re-apply, or get Pro directly from the app.
             </p>
 
             <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 24px;" />
@@ -651,7 +804,7 @@ export function buildSponsorshipCancelledEmail(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pro request cancelled — ${orgName}</title>
+  <title>Pro request cancelled — ${esc(orgName)}</title>
   <style>${FONT_FACE}</style>
 </head>
 <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
@@ -668,9 +821,9 @@ export function buildSponsorshipCancelledEmail(
         <tr>
           <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
             <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">Pro request cancelled</h1>
-            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${recipientName},</p>
+            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${esc(recipientName)},</p>
             <p style="margin:0 0 36px;font-size:15px;color:#334155;line-height:1.7;">
-              <strong>${subscriberName}</strong> has withdrawn their request for a Pro account sponsored by ${orgName}.
+              <strong>${esc(subscriberName)}</strong> has withdrawn their request for a Pro account sponsored by ${esc(orgName)}.
               No action is needed. Their request has been removed from your queue.
             </p>
 
@@ -688,7 +841,7 @@ export function buildSponsorshipCancelledEmail(
             <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 24px;" />
 
             <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
-              You received this email because you manage Pro sponsorships for ${orgName} on Vidopick.
+              You received this email because you manage Pro sponsorships for ${esc(orgName)} on Vidopick.
             </p>
           </td>
         </tr>
@@ -719,10 +872,12 @@ export function buildProRevokedEmail(
   const stillCovered = remainingOrgNames.length > 0;
   const remainingList =
     remainingOrgNames.length === 1
-      ? `<strong>${remainingOrgNames[0]}</strong>`
+      ? `<strong>${esc(remainingOrgNames[0])}</strong>`
       : remainingOrgNames
           .map((n, i) =>
-            i < remainingOrgNames.length - 1 ? `<strong>${n}</strong>` : `and <strong>${n}</strong>`
+            i < remainingOrgNames.length - 1
+              ? `<strong>${esc(n)}</strong>`
+              : `and <strong>${esc(n)}</strong>`
           )
           .join(', ');
 
@@ -754,9 +909,9 @@ export function buildProRevokedEmail(
             <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">
               ${stillCovered ? 'A change to your Pro membership' : 'Your Pro membership has ended'}
             </h1>
-            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${displayName},</p>
+            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${esc(displayName)},</p>
             <p style="margin:0 0 16px;font-size:15px;color:#334155;line-height:1.7;">
-              <strong>${revokedOrgName}</strong> no longer sponsors your Vidopick Pro membership.
+              <strong>${esc(revokedOrgName)}</strong> no longer sponsors your Vidopick Pro membership.
             </p>
             <p style="margin:0 0 36px;font-size:15px;color:#334155;line-height:1.7;">
               ${bodyParagraph}
@@ -780,6 +935,531 @@ export function buildProRevokedEmail(
           </td>
         </tr>
 
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function buildOwnerRefundEmail(
+  customerName: string,
+  customerEmail: string,
+  uid: string,
+  refundAmountDollars: string,
+  estimatedFeeDollars: string,
+  subscriptionType: string,
+  isTestMode: boolean
+): string {
+  const year = new Date().getFullYear();
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Refund processed${isTestMode ? ' [TEST]' : ''}</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+
+        <tr>
+          <td style="padding-bottom:32px;text-align:center;">
+            <span style="${LOGO_STYLE}">Vidopick</span>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07);">
+            <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">
+              ${isTestMode ? '[TEST] ' : ''}Refund processed
+            </h1>
+            <p style="margin:0 0 24px;font-size:14px;color:#64748b;">A customer requested and received a full refund within the 7-day window.</p>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;background:#f8fafc;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
+              <tr>
+                <td style="padding:5px 0;font-size:13px;color:#64748b;">Customer name</td>
+                <td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${esc(customerName)}</td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;font-size:13px;color:#64748b;">Customer email</td>
+                <td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${esc(customerEmail)}</td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;font-size:13px;color:#64748b;">Firebase UID</td>
+                <td style="padding:5px 0;font-size:12px;font-family:monospace;color:#64748b;text-align:right;">${uid}</td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;font-size:13px;color:#64748b;">Plan</td>
+                <td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">Pro ${subscriptionType === 'year' ? 'Annual' : 'Monthly'}</td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;font-size:13px;color:#64748b;">Amount refunded</td>
+                <td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">$${refundAmountDollars}</td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;font-size:13px;color:#64748b;">Stripe fee (not returned)</td>
+                <td style="padding:5px 0;font-size:13px;color:#ef4444;font-weight:700;text-align:right;">-$${estimatedFeeDollars}</td>
+              </tr>
+            </table>
+
+            <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.6;">
+              Stripe's processing fee (~2.9% + $0.30) is not returned on refunds.
+              The estimated fee shown is approximate.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding-top:24px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              &copy; ${year} Vidopick &middot;
+              <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function buildAffiliateSaleEmail(
+  affiliateName: string,
+  customerAmountDollars: string,
+  commissionDollars: string,
+  subscriptionType: string,
+  couponName: string | null,
+  dashboardUrl: string
+): string {
+  const year = new Date().getFullYear();
+  const couponLine = couponName
+    ? `<p style="margin:0 0 8px;font-size:14px;color:#64748b;line-height:1.6;">Coupon used: <strong>${esc(couponName!)}</strong></p>`
+    : '';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>You made a sale!</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+
+        <tr>
+          <td style="background-color:#0b172a;border-radius:20px 20px 0 0;padding:40px 32px 32px;text-align:center;">
+            <p style="margin:0 0 16px;"><span style="${LOGO_STYLE}color:#ffffff;">Vidopick</span></p>
+            <p style="margin:0;font-size:40px;">🎉</p>
+            <h1 style="margin:12px 0 0;font-size:28px;font-weight:800;color:#ffffff;line-height:1.2;">You made a sale!</h1>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:0 0 20px 20px;padding:32px 40px 40px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.10);">
+            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${esc(affiliateName)},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#334155;line-height:1.7;">
+              A new subscriber just signed up through your referral link. Here's a summary:
+            </p>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;background:#f8fafc;border-radius:14px;padding:20px 24px;margin-bottom:28px;">
+              <tr>
+                <td style="padding:6px 0;font-size:14px;color:#64748b;">Plan</td>
+                <td style="padding:6px 0;font-size:14px;color:#0f172a;font-weight:600;text-align:right;">Vidopick Pro ${subscriptionType === 'year' ? 'Annual' : 'Monthly'}</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;font-size:14px;color:#64748b;">Customer paid</td>
+                <td style="padding:6px 0;font-size:14px;color:#0f172a;font-weight:600;text-align:right;">$${customerAmountDollars}</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;font-size:14px;color:#64748b;">Your commission</td>
+                <td style="padding:6px 0;font-size:20px;color:#10b981;font-weight:800;text-align:right;">$${commissionDollars}</td>
+              </tr>
+              ${couponLine ? `<tr><td style="padding:6px 0;font-size:14px;color:#64748b;">Coupon</td><td style="padding:6px 0;font-size:14px;color:#0f172a;font-weight:600;text-align:right;">${esc(couponName!)}</td></tr>` : ''}
+            </table>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 32px;">
+              <tr>
+                <td style="background-color:#1d4ed8;border-radius:10px;">
+                  <a href="${dashboardUrl}"
+                     style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.01em;white-space:nowrap;">
+                    View Dashboard &rarr;
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px;" />
+            <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
+              Commissions are held for 30 days before approval. Approved amounts over $25 are paid monthly via PayPal.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding-top:24px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              &copy; ${year} Vidopick &middot;
+              <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Sent to an affiliate when they finish onboarding in the partner dashboard.
+ */
+export function buildAffiliateWelcomeEmail(
+  affiliateName: string,
+  commissionPercent: number,
+  publicProfilePercent: number,
+  publicPageUrl: string | null,
+  dashboardUrl: string
+): string {
+  const year = new Date().getFullYear();
+  const firstName = affiliateName.split(' ')[0] || affiliateName;
+  const pageRow = publicPageUrl
+    ? `<tr>
+        <td style="padding:6px 0;font-size:14px;color:#64748b;">Your public page</td>
+        <td style="padding:6px 0;font-size:14px;text-align:right;"><a href="${esc(publicPageUrl)}" style="color:#1d4ed8;font-weight:600;text-decoration:none;">${esc(publicPageUrl.replace(/^https?:\/\//, ''))}</a></td>
+      </tr>`
+    : '';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Welcome to Vidopick Affiliates</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+
+        <tr>
+          <td style="background-color:#0b172a;border-radius:20px 20px 0 0;padding:40px 32px 32px;text-align:center;">
+            <p style="margin:0 0 16px;"><span style="${LOGO_STYLE}color:#ffffff;">Vidopick</span></p>
+            <p style="margin:0;font-size:40px;">🤝</p>
+            <h1 style="margin:12px 0 0;font-size:28px;font-weight:800;color:#ffffff;line-height:1.2;">Welcome to Vidopick Affiliates!</h1>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:0 0 20px 20px;padding:32px 40px 40px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.10);">
+            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${esc(firstName)},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#334155;line-height:1.7;">
+              Your affiliate account is fully set up. You're ready to start sharing and earning.
+              Here's a quick recap:
+            </p>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;background:#f8fafc;border-radius:14px;padding:20px 24px;margin-bottom:28px;">
+              <tr>
+                <td style="padding:6px 0;font-size:14px;color:#64748b;">Referral commission</td>
+                <td style="padding:6px 0;font-size:14px;color:#0f172a;font-weight:600;text-align:right;">${commissionPercent}% of every payment</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;font-size:14px;color:#64748b;">Public page sales</td>
+                <td style="padding:6px 0;font-size:14px;color:#0f172a;font-weight:600;text-align:right;">${publicProfilePercent}% passive commission</td>
+              </tr>
+              ${pageRow}
+              <tr>
+                <td style="padding:6px 0;font-size:14px;color:#64748b;">Payouts</td>
+                <td style="padding:6px 0;font-size:14px;color:#0f172a;font-weight:600;text-align:right;">Monthly, once you reach $25</td>
+              </tr>
+            </table>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 32px;">
+              <tr>
+                <td style="background-color:#1d4ed8;border-radius:10px;">
+                  <a href="${esc(dashboardUrl)}"
+                     style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.01em;white-space:nowrap;">
+                    Open Your Dashboard &rarr;
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px;" />
+            <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
+              Questions? <a href="mailto:vidopickhelp@gmail.com" style="color:#4470ad;text-decoration:underline;">Reach out to us</a>
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding-top:24px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              &copy; ${year} Vidopick &middot;
+              <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function buildOwnerSaleEmail(
+  affiliateName: string,
+  affiliateEmail: string,
+  customerAmountDollars: string,
+  commissionDollars: string,
+  subscriptionType: string,
+  couponName: string | null,
+  uid: string
+): string {
+  const year = new Date().getFullYear();
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Vidopick sale</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+
+        <tr>
+          <td style="padding-bottom:32px;text-align:center;">
+            <span style="${LOGO_STYLE}">Vidopick</span>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07);">
+            <h1 style="margin:0 0 8px;font-size:24px;font-weight:700;color:#0f172a;">💰 New sale!</h1>
+            <p style="margin:0 0 24px;font-size:14px;color:#64748b;">A Vidopick Pro subscription was just purchased.</p>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;background:#f8fafc;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
+              <tr>
+                <td style="padding:5px 0;font-size:13px;color:#64748b;">Plan</td>
+                <td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">Pro ${subscriptionType === 'year' ? 'Annual' : 'Monthly'}</td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;font-size:13px;color:#64748b;">Amount</td>
+                <td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">$${customerAmountDollars}</td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;font-size:13px;color:#64748b;">Affiliate</td>
+                <td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${esc(affiliateName)} (${esc(affiliateEmail)})</td>
+              </tr>
+              <tr>
+                <td style="padding:5px 0;font-size:13px;color:#64748b;">Commission owed</td>
+                <td style="padding:5px 0;font-size:13px;color:#ef4444;font-weight:700;text-align:right;">$${commissionDollars}</td>
+              </tr>
+              ${couponName ? `<tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Coupon</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${esc(couponName)}</td></tr>` : ''}
+              <tr>
+                <td style="padding:5px 0;font-size:13px;color:#64748b;">User UID</td>
+                <td style="padding:5px 0;font-size:12px;font-family:monospace;color:#64748b;text-align:right;">${uid}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding-top:24px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              &copy; ${year} Vidopick &middot;
+              <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function buildOwnerDirectSaleEmail(
+  customerName: string,
+  customerEmail: string,
+  uid: string,
+  amountDollars: string,
+  subscriptionType: string,
+  isTestMode: boolean
+): string {
+  const year = new Date().getFullYear();
+  const planLabel = subscriptionType === 'year' ? 'Pro Annual' : 'Pro Monthly';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${isTestMode ? '[TEST] ' : ''}New sale</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+        <tr><td style="padding-bottom:32px;text-align:center;"><span style="${LOGO_STYLE}">Vidopick</span></td></tr>
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07);">
+            <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">${isTestMode ? '[TEST] ' : ''}💰 New sale!</h1>
+            <p style="margin:0 0 24px;font-size:14px;color:#64748b;">A Vidopick Pro subscription was just purchased.</p>
+            <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;background:#f8fafc;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Customer</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${esc(customerName)}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Email</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${esc(customerEmail)}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Plan</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${planLabel}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Amount</td><td style="padding:5px 0;font-size:13px;color:#16a34a;font-weight:700;text-align:right;">$${amountDollars}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">UID</td><td style="padding:5px 0;font-size:12px;font-family:monospace;color:#64748b;text-align:right;">${uid}</td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr><td style="padding-top:24px;text-align:center;"><p style="margin:0;font-size:12px;color:#94a3b8;">&copy; ${year} Vidopick &middot; <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a></p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function buildOwnerTrialStartEmail(
+  customerName: string,
+  customerEmail: string,
+  uid: string,
+  subscriptionType: string,
+  trialEndDate: string,
+  isTestMode: boolean
+): string {
+  const year = new Date().getFullYear();
+  const planLabel = subscriptionType === 'year' ? 'Pro Annual' : 'Pro Monthly';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${isTestMode ? '[TEST] ' : ''}New free trial</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+        <tr><td style="padding-bottom:32px;text-align:center;"><span style="${LOGO_STYLE}">Vidopick</span></td></tr>
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07);">
+            <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">${isTestMode ? '[TEST] ' : ''}🆕 New free trial started</h1>
+            <p style="margin:0 0 24px;font-size:14px;color:#64748b;">A new subscriber just started their 14-day free trial.</p>
+            <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;background:#f8fafc;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Customer</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${esc(customerName)}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Email</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${esc(customerEmail)}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Plan</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${planLabel}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Trial ends</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${trialEndDate}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">UID</td><td style="padding:5px 0;font-size:12px;font-family:monospace;color:#64748b;text-align:right;">${uid}</td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr><td style="padding-top:24px;text-align:center;"><p style="margin:0;font-size:12px;color:#94a3b8;">&copy; ${year} Vidopick &middot; <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a></p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function buildOwnerCancellationEmail(
+  customerName: string,
+  customerEmail: string,
+  uid: string,
+  accessUntil: string,
+  withinRefundWindow: boolean,
+  subscriptionType: string,
+  isTestMode: boolean
+): string {
+  const year = new Date().getFullYear();
+  const planLabel = subscriptionType === 'year' ? 'Pro Annual' : 'Pro Monthly';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${isTestMode ? '[TEST] ' : ''}Subscription cancelled</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+        <tr><td style="padding-bottom:32px;text-align:center;"><span style="${LOGO_STYLE}">Vidopick</span></td></tr>
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07);">
+            <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">${isTestMode ? '[TEST] ' : ''}❌ Subscription cancelled</h1>
+            <p style="margin:0 0 24px;font-size:14px;color:#64748b;">A customer scheduled their subscription to cancel at period end.</p>
+            <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;background:#f8fafc;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Customer</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${esc(customerName)}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Email</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${esc(customerEmail)}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Plan</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${planLabel}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Access until</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${accessUntil}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Refund eligible</td><td style="padding:5px 0;font-size:13px;font-weight:700;text-align:right;color:${withinRefundWindow ? '#f59e0b' : '#64748b'};">${withinRefundWindow ? '⚠️ Yes — within 7 days' : 'No'}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">UID</td><td style="padding:5px 0;font-size:12px;font-family:monospace;color:#64748b;text-align:right;">${uid}</td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr><td style="padding-top:24px;text-align:center;"><p style="margin:0;font-size:12px;color:#94a3b8;">&copy; ${year} Vidopick &middot; <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a></p></td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function buildOwnerUncancellationEmail(
+  customerName: string,
+  customerEmail: string,
+  uid: string,
+  subscriptionType: string,
+  isTestMode: boolean
+): string {
+  const year = new Date().getFullYear();
+  const planLabel = subscriptionType === 'year' ? 'Pro Annual' : 'Pro Monthly';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${isTestMode ? '[TEST] ' : ''}Subscription reactivated</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+        <tr><td style="padding-bottom:32px;text-align:center;"><span style="${LOGO_STYLE}">Vidopick</span></td></tr>
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07);">
+            <h1 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#0f172a;">${isTestMode ? '[TEST] ' : ''}↩️ Subscription reactivated</h1>
+            <p style="margin:0 0 24px;font-size:14px;color:#64748b;">A customer clicked "Don't cancel subscription" and reversed their cancellation.</p>
+            <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;background:#f8fafc;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Customer</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${esc(customerName)}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Email</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${esc(customerEmail)}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">Plan</td><td style="padding:5px 0;font-size:13px;color:#0f172a;font-weight:600;text-align:right;">${planLabel}</td></tr>
+              <tr><td style="padding:5px 0;font-size:13px;color:#64748b;">UID</td><td style="padding:5px 0;font-size:12px;font-family:monospace;color:#64748b;text-align:right;">${uid}</td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr><td style="padding-top:24px;text-align:center;"><p style="margin:0;font-size:12px;color:#94a3b8;">&copy; ${year} Vidopick &middot; <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a></p></td></tr>
       </table>
     </td></tr>
   </table>
@@ -865,7 +1545,7 @@ export function buildMemberAppInviteEmail(
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${orgName} invites you to Vidopick</title>
+  <title>${esc(orgName)} invites you to Vidopick</title>
   <style>${FONT_FACE}</style>
 </head>
 <body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
@@ -881,10 +1561,10 @@ export function buildMemberAppInviteEmail(
 
         <tr>
           <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
-            <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">${orgName} invites you to Vidopick</h1>
-            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${memberName},</p>
+            <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">${esc(orgName)} invites you to Vidopick</h1>
+            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${esc(memberName)},</p>
             <p style="margin:0 0 32px;font-size:15px;color:#334155;line-height:1.7;">
-              You've been added as a staff member for <strong>${orgName}</strong> on Vidopick.
+              You've been added as a staff member for <strong>${esc(orgName)}</strong> on Vidopick.
               Tap the button below to get the app and accept your invite — it only takes a minute.
             </p>
 

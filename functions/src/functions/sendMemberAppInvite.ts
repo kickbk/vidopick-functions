@@ -71,7 +71,7 @@ export const sendMemberAppInvite = onCall(async (request) => {
     await db
       .doc(`shortLinks/${prevLinkId}`)
       .update({ disabled: true })
-      .catch(() => {});
+      .catch((e) => console.warn(`[sendMemberAppInvite] disabling previous link ${prevLinkId} failed:`, e));
   }
 
   // Create the new invite short link

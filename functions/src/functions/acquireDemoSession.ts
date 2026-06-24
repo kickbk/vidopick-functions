@@ -7,6 +7,7 @@ if (!admin.apps.length) {
 }
 
 const DEMO_ORGANIZATION_ID = process.env.DEMO_ORGANIZATION_ID;
+const DEMO_AUTH_UID = process.env.DEMO_AUTH_UID;
 const SESSION_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
 
 /**
@@ -63,7 +64,25 @@ export const acquireDemoSession = onCall(async (request) => {
     );
   }
 
-  console.log(`Demo session acquired by ${recipientEmail ?? request.auth.uid}`);
+  // Self-heal: if the demo auth account has lost its role claims (e.g. after being reset),
+  // restore them now so the front-end token refresh picks them up immediately.
+  // Only allowed for the designated demo auth account — prevents any authenticated
+  // caller from acquiring permanent org-level claims via this function.
+  const uid = request.auth.uid;
+  if (DEMO_AUTH_UID && uid === DEMO_AUTH_UID) {
+    const userRecord = await admin.auth().getUser(uid);
+    const existingClaims = (userRecord.customClaims ?? {}) as Record<string, unknown>;
+    if (!existingClaims.role) {
+      await admin.auth().setCustomUserClaims(uid, {
+        ...existingClaims,
+        role: 'organization',
+        organizationId: DEMO_ORGANIZATION_ID,
+      });
+      console.log(`acquireDemoSession: restored missing claims for demo user ${uid}`);
+    }
+  }
+
+  console.log(`Demo session acquired by ${recipientEmail ?? uid}`);
   await sendDemoNotification(recipientEmail ?? null);
   return { success: true };
 });

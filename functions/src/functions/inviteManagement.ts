@@ -1,6 +1,11 @@
 import * as admin from 'firebase-admin';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { defineSecret } from 'firebase-functions/params';
 import { nanoid } from 'nanoid';
+import Stripe from 'stripe';
+
+const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
+const stripeSecretKeyTest = defineSecret('STRIPE_SECRET_KEY_TEST');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -39,7 +44,9 @@ interface CreateInviteRequest {
  * - Admin: Can create invite for any organization
  * - Organization: Can only create invite for their own organizationId
  */
-export const createInvite = onCall(async (request) => {
+export const createInvite = onCall(
+  { region: 'us-central1', secrets: [stripeSecretKey, stripeSecretKeyTest] },
+  async (request) => {
   // Must be authenticated
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be logged in');
@@ -62,17 +69,20 @@ export const createInvite = onCall(async (request) => {
     ogImage,
   } = data;
 
-  if (!name) {
-    throw new HttpsError('invalid-argument', 'Name is required');
-  }
-
   const isAdmin = request.auth.token.role === 'admin';
   const isOrganization = request.auth.token.role === 'organization';
   const isMember = request.auth.token.role === 'member';
   const userOrganizationId = request.auth.token.organizationId as string | undefined;
   const userMemberId = request.auth.token.memberId as string | undefined;
 
-  if (!isAdmin && !isOrganization && !isMember) {
+  // Allow pro users to share their own profiles
+  let isProUserSharingOwnProfile = false;
+  if (!isAdmin && !isOrganization && !isMember && profileRef && profileRef.uid === request.auth.uid) {
+    const userDoc = await db.doc(`users/${request.auth.uid}`).get();
+    isProUserSharingOwnProfile = userDoc.data()?.proStatus === 'active';
+  }
+
+  if (!isAdmin && !isOrganization && !isMember && !isProUserSharingOwnProfile) {
     throw new HttpsError(
       'permission-denied',
       'Only admins, organizations, and members can create invites'
@@ -86,9 +96,41 @@ export const createInvite = onCall(async (request) => {
     );
   }
 
+  // Pro users are only authorized to share their own profile — never honor
+  // client-supplied org/member attribution for them, or the invite would
+  // appear to come from an organization they don't belong to.
+  const requestedOrganizationId = isProUserSharingOwnProfile ? undefined : organizationId;
+  const requestedOrganizationName = isProUserSharingOwnProfile ? undefined : organizationName;
+  const requestedMemberId = isProUserSharingOwnProfile ? undefined : memberId;
+  const requestedMemberName = isProUserSharingOwnProfile ? undefined : memberName;
+
   // Auto-fill from token claims for org/member users
-  const finalOrganizationId = !isAdmin && userOrganizationId ? userOrganizationId : organizationId;
-  const finalMemberId = isMember ? userMemberId : memberId;
+  const finalOrganizationId =
+    !isAdmin && userOrganizationId ? userOrganizationId : requestedOrganizationId;
+  const finalMemberId = isMember ? userMemberId : requestedMemberId;
+
+  // Resolve inviter name and capture affiliate data for decoration.
+  let resolvedName = name;
+  let affiliateId: string | null = null;
+  let affiliateDiscountPercent = 0;
+  if (!isAdmin) {
+    const uid = request.auth.uid;
+    const affiliateSnap = await db.collection('affiliates').where('authUid', '==', uid).where('type', '==', 'influencer').limit(1).get();
+    if (!affiliateSnap.empty) {
+      affiliateId = affiliateSnap.docs[0].id;
+      const affiliateData = affiliateSnap.docs[0].data();
+      resolvedName = affiliateData.name ?? name;
+      affiliateDiscountPercent = affiliateData.discountPercent ?? 0;
+    } else {
+      const userDoc = await db.doc(`users/${uid}`).get();
+      const userData = userDoc.data();
+      if (userData) resolvedName = userData.name ?? userData.memberName ?? name;
+    }
+  }
+
+  if (!resolvedName) {
+    throw new HttpsError('invalid-argument', 'Name is required');
+  }
 
   // Reserve ID (either custom slug or generate random)
   let id: string;
@@ -187,12 +229,44 @@ export const createInvite = onCall(async (request) => {
     }
   }
 
+  // App-share (QR) links attribute commission to the affiliate via referral capture
+  // (referredByAffiliateId / referredByShortlinkId on the invitee — see stripeWebhook),
+  // independent of any coupon. By default these links give the invitee NO discount, so an
+  // affiliate's casual in-person QR shares never pollute a named campaign's stats or hand
+  // out a discount. Flip `appInviteeDiscount: true` in config/affiliates to also offer the
+  // invitee discount on app links later — no other change required.
+  let appInviteeDiscount = false;
+  if (affiliateId) {
+    const affConfigSnap = await db.doc('config/affiliates').get();
+    appInviteeDiscount = affConfigSnap.data()?.appInviteeDiscount === true;
+  }
+
+  // Create Stripe coupon only when this is an affiliate invite with a discount AND
+  // invitee discounts are enabled for app links.
+  let stripeCouponId: string | null = null;
+  if (affiliateId && affiliateDiscountPercent > 0 && appInviteeDiscount) {
+    try {
+      const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2026-03-25.dahlia' });
+      const coupon = await stripe.coupons.create({
+        percent_off: affiliateDiscountPercent,
+        duration: 'forever',
+        name: resolvedName,
+        metadata: { affiliateId, linkType: 'app' },
+      });
+      stripeCouponId = coupon.id;
+    } catch (e) {
+      console.warn('[createInvite] Stripe coupon creation failed, proceeding without discount:', e);
+    }
+  }
+
   // Build invite document
   const inviteDoc = {
-    linkTitle: `${name} invites you to try Vidopick`,
+    linkTitle: `${resolvedName} invites you to try Vidopick`,
+    linkType: 'app',
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     createdBy: request.auth.uid,
     ttl: ttlDate,
+    ...(affiliateId ? { affiliateId, discountPercent: affiliateDiscountPercent, stripeCouponId } : {}),
     redirect: {
       ios: 'https://apps.apple.com/us/app/vidopick/id6749210639',
       android: 'https://play.google.com/store/apps/details?id=com.vidopick.app',
@@ -200,11 +274,11 @@ export const createInvite = onCall(async (request) => {
       webOnly: false,
     },
     params: {
-      name,
+      name: resolvedName,
       ...(finalOrganizationId ? { organizationId: finalOrganizationId } : {}),
-      ...(organizationName ? { organizationName } : {}),
+      ...(requestedOrganizationName ? { organizationName: requestedOrganizationName } : {}),
       ...(finalMemberId ? { memberId: finalMemberId } : {}),
-      ...(memberName ? { memberName } : {}),
+      ...(requestedMemberName ? { memberName: requestedMemberName } : {}),
       ...(playlists && playlists.length > 0 ? { playlists } : {}),
       ...(profileSnapshot ? { profile: profileSnapshot } : {}),
       ...(requiresDisplayName ? { requiresDisplayName: true } : {}),
@@ -309,6 +383,32 @@ export const updateInvite = onCall(async (request) => {
 
   if (!isAdmin && !isOwner) {
     throw new HttpsError('permission-denied', 'You can only edit your own invites');
+  }
+
+  // Scope attribution updates by role: org/member users may only reference
+  // their own ids; callers without a role (pro users sharing a profile) may
+  // not change org/member attribution at all.
+  if (!isAdmin) {
+    const role = request.auth.token.role;
+    const callerOrgId = request.auth.token.organizationId as string | undefined;
+    const callerMemberId = request.auth.token.memberId as string | undefined;
+
+    if (role === 'organization' || role === 'member') {
+      if (updates.organizationId !== undefined && updates.organizationId !== callerOrgId) {
+        throw new HttpsError(
+          'permission-denied',
+          'You can only assign invites to your own organization'
+        );
+      }
+      if (role === 'member' && updates.memberId !== undefined && updates.memberId !== callerMemberId) {
+        throw new HttpsError('permission-denied', 'You can only assign invites to yourself');
+      }
+    } else {
+      delete updates.organizationId;
+      delete updates.organizationName;
+      delete updates.memberId;
+      delete updates.memberName;
+    }
   }
 
   // Build update object
@@ -507,6 +607,12 @@ export const disableInvite = onCall(async (request) => {
   const invite = inviteSnap.data();
   const isAdmin = request.auth.token.role === 'admin';
   let isOwner = invite?.createdBy === request.auth.uid;
+
+  // Profile owner can always stop sharing their own profile, even if they didn't
+  // create the shortlink (e.g. affiliate links set inviteId without a createdBy field).
+  if (!isOwner && invite?.params?.profile?.uid === request.auth.uid) {
+    isOwner = true;
+  }
 
   if (!isAdmin && !isOwner) {
     const orgSnapshot = await db

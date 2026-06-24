@@ -9,6 +9,9 @@ export { deleteOrganization } from './functions/deleteOrganization';
 export { removeOrganizationAccount } from './functions/removeOrganizationAccount';
 export { sendOrganizationInvite, sendSignInLink } from './functions/sendOrganizationMagicLink';
 export { sendAppMagicLink } from './functions/sendAppMagicLink';
+export { sendEmailUpdateLink } from './functions/sendEmailUpdateLink';
+export { completeEmailChange } from './functions/completeEmailChange';
+export { revertEmailChange } from './functions/revertEmailChange';
 export { revokeProAccount } from './functions/revokeProAccount';
 export { getCustomTokenForCheckout } from './functions/getCustomTokenForCheckout';
 export { createStripeCheckoutSession } from './functions/createStripeCheckoutSession';
@@ -37,7 +40,6 @@ export { savePlaylistFromExtension } from './functions/savePlaylistFromExtension
 export { deletePlaylistFromExtension } from './functions/deletePlaylistFromExtension';
 export { sendSupportEmail } from './functions/sendSupportEmail';
 export { sendSamEmail } from './functions/sendSamEmail';
-export { setAdminClaims } from './functions/setAdminClaims';
 export {
   setOrganizationClaims,
   setOrganizationClaimsManual,
@@ -75,6 +77,7 @@ export { trackAdImpression } from './functions/trackAdImpression';
 export { refreshPlaylistMetadata } from './functions/refreshPlaylistMetadata';
 export { analyzeSharedPlaylist } from './functions/analyzeSharedPlaylist';
 export { scanUserPlaylist } from './functions/scanUserPlaylist';
+export { reportPlaylistUnavailable } from './functions/reportPlaylistUnavailable';
 export {
   onPlaylistCreated,
   onPlaylistDeleted,
@@ -82,3 +85,28 @@ export {
   getPlaylistIdIndex,
 } from './functions/syncPlaylistIdIndex';
 export { onUserCreated } from './functions/onUserCreated';
+export { saveReferral } from './functions/saveReferral';
+export { claimAffiliatePro } from './functions/claimAffiliatePro';
+export { deleteAffiliate } from './functions/deleteAffiliate';
+export { approveCommissions } from './functions/approveCommissions';
+export { sendAffiliateInvite } from './functions/sendAffiliateInvite';
+export { sendAffiliateSignInLink } from './functions/sendAffiliateSignInLink';
+export { createAffiliateShortlink } from './functions/createAffiliateShortlink';
+export { backfillAffiliateShortlinks } from './functions/backfillAffiliateShortlinks';
+export { updateAffiliateShortlink } from './functions/updateAffiliateShortlink';
+export { disableAffiliateShortlink } from './functions/disableAffiliateShortlink';
+export { enableAffiliateShortlink } from './functions/enableAffiliateShortlink';
+export { requestProRefund } from './functions/requestProRefund';
+export { claimVidopickerSlug } from './functions/claimVidopickerSlug';
+export { addPublicProfile } from './functions/addPublicProfile';
+export { removePublicProfile } from './functions/removePublicProfile';
+export { onProfileSharingDisabled } from './functions/onProfileSharingDisabled';
+export { onVpAffiliateWrite, onVpPublicProfileWrite, onVidopickProfileDeleted } from './functions/generateVpProfile';
+export { serveVpProfile } from './functions/serveVpProfile';
+export { serveSitemap } from './functions/serveSitemap';
+export { analyzeAffiliateWebsite } from './functions/analyzeAffiliateWebsite';
+export { generateAffiliateCopy } from './functions/generateAffiliateCopy';
+export { sendAffiliateOutreachEmail } from './functions/sendAffiliateOutreachEmail';
+export { resendOutreachWebhook } from './functions/resendOutreachWebhook';
+export { importLeadsFromUpload } from './functions/importLeadsFromUpload';
+export { activateAffiliateJoin } from './functions/activateAffiliateJoin';

@@ -3,6 +3,8 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { Resend } from 'resend';
 import axios from 'axios';
 
+import { checkRateLimit, requestIp } from '../utils/rateLimit';
+
 // 1. Initialize Firestore
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -243,8 +245,17 @@ export const analyzeSharedPlaylist = onRequest(
     }
 
     const { playlistId } = request.body;
-    if (!playlistId) {
-      response.status(400).json({ error: 'Missing playlistId' });
+    if (!playlistId || typeof playlistId !== 'string' || !/^[A-Za-z0-9_-]{10,60}$/.test(playlistId)) {
+      response.status(400).json({ error: 'Missing or invalid playlistId' });
+      return;
+    }
+
+    // Unauthenticated endpoint that triggers OpenAI/YouTube calls for new
+    // playlists — cap per-IP volume (cached playlists below are unaffected
+    // in practice since the limit is generous).
+    const ip = requestIp(request);
+    if (!(await checkRateLimit(`analyze_${ip}`, 20))) {
+      response.status(429).json({ error: 'Too many requests. Please try again later.' });
       return;
     }
 

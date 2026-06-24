@@ -38,10 +38,11 @@ export const monthlyOrgBilling = onSchedule(
     const db = admin.firestore();
     const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2026-03-25.dahlia' });
 
-    // Previous month window (the 1st runs at 00:00 UTC — now IS the monthEnd)
+    // Previous-calendar-month window. Robust to delayed scheduler fires: any run
+    // during month N bills month N-1, regardless of the exact time of day.
     const now = new Date();
     const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-    const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)); // = now
+    const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
     const monthLabel = monthStart.toLocaleString('default', {
       month: 'long',
       year: 'numeric',
@@ -89,27 +90,41 @@ export const monthlyOrgBilling = onSchedule(
         continue;
       }
 
-      // Count billable users
-      const usersSnap = await db.collection(`orgSponsors/${orgId}/users`).get();
+      // Count billable users — paginated so large orgs can't exhaust memory
       let billableCount = 0;
+      const PAGE_SIZE = 1000;
+      let lastUserDoc: admin.firestore.QueryDocumentSnapshot | undefined;
 
-      for (const userDoc of usersSnap.docs) {
-        const periods: Array<{
-          startedAt: admin.firestore.Timestamp;
-          endedAt: admin.firestore.Timestamp | null;
-        }> = userDoc.data().periods ?? [];
+      for (;;) {
+        let usersQuery = db
+          .collection(`orgSponsors/${orgId}/users`)
+          .orderBy(admin.firestore.FieldPath.documentId())
+          .limit(PAGE_SIZE);
+        if (lastUserDoc) usersQuery = usersQuery.startAfter(lastUserDoc);
+        const usersSnap = await usersQuery.get();
+        if (usersSnap.empty) break;
 
-        let totalSeconds = 0;
-        for (const period of periods) {
-          const start = period.startedAt.toDate();
-          const end = period.endedAt ? period.endedAt.toDate() : monthEnd;
-          const effectiveStart = start < monthStart ? monthStart : start;
-          const effectiveEnd = end > monthEnd ? monthEnd : end;
-          if (effectiveEnd > effectiveStart) {
-            totalSeconds += (effectiveEnd.getTime() - effectiveStart.getTime()) / 1000;
+        for (const userDoc of usersSnap.docs) {
+          const periods: Array<{
+            startedAt: admin.firestore.Timestamp;
+            endedAt: admin.firestore.Timestamp | null;
+          }> = userDoc.data().periods ?? [];
+
+          let totalSeconds = 0;
+          for (const period of periods) {
+            const start = period.startedAt.toDate();
+            const end = period.endedAt ? period.endedAt.toDate() : monthEnd;
+            const effectiveStart = start < monthStart ? monthStart : start;
+            const effectiveEnd = end > monthEnd ? monthEnd : end;
+            if (effectiveEnd > effectiveStart) {
+              totalSeconds += (effectiveEnd.getTime() - effectiveStart.getTime()) / 1000;
+            }
           }
+          if (totalSeconds >= MIN_BILLABLE_SECONDS) billableCount++;
         }
-        if (totalSeconds >= MIN_BILLABLE_SECONDS) billableCount++;
+
+        if (usersSnap.size < PAGE_SIZE) break;
+        lastUserDoc = usersSnap.docs[usersSnap.docs.length - 1];
       }
 
       // Skip management fee for the partial first month (waived until billingStartDate)
@@ -240,7 +255,7 @@ async function suspendOrg(
       await notifyUser(db, uid, deviceTokens, notifTitle, notifBody, {
         type: 'pro_suspended',
         organizationId: orgId,
-      }).catch(() => {});
+      }).catch((e) => console.warn(`[monthlyOrgBilling] pro-suspended notification failed uid=${uid}:`, e));
     }
   }
 

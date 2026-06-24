@@ -169,22 +169,38 @@ function derivePlaylistCount(data: any): number {
 }
 
 // Rollup only (no per-click docs)
-function rollupClick(id: string, platform: 'ios' | 'android' | 'desktop') {
-  db.collection('shortLinks')
-    .doc(id)
-    .set(
+async function rollupClick(id: string, platform: 'ios' | 'android' | 'desktop', affiliateId?: string) {
+  const date = new Date().toISOString().slice(0, 10);
+
+  // Always update the shortlink counter
+  try {
+    await db.collection('shortLinks').doc(id).set(
       {
         analytics: {
           clicks: {
             total: admin.firestore.FieldValue.increment(1),
-            byPlatform: { [platform]: admin.firestore.FieldValue.increment(1) }, // fixed key
+            byPlatform: { [platform]: admin.firestore.FieldValue.increment(1) },
             lastClickAt: admin.firestore.FieldValue.serverTimestamp(),
           },
         },
       },
       { merge: true }
-    )
-    .catch((e) => console.warn('click analytics update failed', e));
+    );
+  } catch (e) {
+    console.error(`[rollupClick] shortLink write failed id=${id}:`, e);
+  }
+
+  // Separately update affiliate dailyStats so a failure here doesn't affect the link counter
+  if (affiliateId) {
+    try {
+      await db.collection('affiliates').doc(affiliateId).collection('dailyStats').doc(date).set(
+        { clicks: admin.firestore.FieldValue.increment(1) },
+        { merge: true }
+      );
+    } catch (e) {
+      console.error(`[rollupClick] dailyStats write failed affiliateId=${affiliateId} date=${date}:`, e);
+    }
+  }
 }
 
 // --- Auth redirect (Firebase magic-link continueUrl) ---
@@ -447,16 +463,17 @@ app.get('/:id', async (req, res) => {
     if (!wantsContinue) return res.redirect(302, landing);
 
     // Continue → device-aware redirect + rollup
+    const affiliateId = (data as any).affiliateId as string | undefined;
     let target: string;
     if (webOnly) {
       // roll up using actual device (not always desktop)
-      void rollupClick(id, device);
+      void rollupClick(id, device, affiliateId);
       target = appendParams(desktopUrl, qs) || landing;
     } else if (isIOS(ua) && iosUrl) {
-      void rollupClick(id, 'ios');
+      void rollupClick(id, 'ios', affiliateId);
       target = iosUrl; // never append qs to iOS store
     } else if (isAndroid(ua) && androidUrl) {
-      void rollupClick(id, 'android');
+      void rollupClick(id, 'android', affiliateId);
       const referrerPayload: Record<string, string> = {
         ...paramsObj, // All invite params
         src: 'dl',
@@ -464,7 +481,7 @@ app.get('/:id', async (req, res) => {
       };
       target = withPlayReferrer(androidUrl, referrerPayload);
     } else {
-      void rollupClick(id, 'desktop');
+      void rollupClick(id, 'desktop', affiliateId);
       target = appendParams(desktopUrl, qs) || landing;
     }
 

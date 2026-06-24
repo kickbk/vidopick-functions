@@ -1,9 +1,26 @@
+import * as crypto from 'crypto';
+
 import * as admin from 'firebase-admin';
 import { Resend } from 'resend';
 import { HttpsError, onCall, onRequest } from 'firebase-functions/v2/https';
 
+import { checkRateLimit, requestIp } from '../utils/rateLimit';
+
 if (!admin.apps.length) {
   admin.initializeApp();
+}
+
+// Non-ambiguous alphabet (no 0/O, 1/I/L) for the on-screen manual-entry code.
+// Independent of the sessionId so showing the code never leaks part of the secret.
+const SHORT_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+function generateShortCode(length = 8): string {
+  const bytes = crypto.randomBytes(length);
+  let code = '';
+  for (let i = 0; i < length; i++) {
+    code += SHORT_CODE_ALPHABET[bytes[i] % SHORT_CODE_ALPHABET.length];
+  }
+  return code;
 }
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
@@ -58,15 +75,21 @@ export const createDeviceSession = onRequest(
     const sessionRef = db.collection('deviceSessions').doc();
     const sessionId = sessionRef.id;
 
+    const shortCode = generateShortCode();
+
     await sessionRef.set({
       status: 'pending',
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       expiresAt: new Date(Date.now() + SESSION_TTL_MS),
-      // First 8 chars uppercased — shown on device for manual entry at vpk.to/device-auth
-      shortCode: sessionId.slice(0, 8).toUpperCase(),
+      // Shown on device for manual entry at vpk.to/device-auth
+      shortCode,
+      // App builds prior to the shortCode-in-response change derive the displayed
+      // code from the sessionId prefix; keep resolving those until OTA rollout
+      // completes, then this field (and its lookup fallback) can be removed.
+      legacyShortCode: sessionId.slice(0, 8).toUpperCase(),
     });
 
-    res.json({ sessionId });
+    res.json({ sessionId, shortCode });
   }
 );
 
@@ -172,17 +195,41 @@ export const sendDeviceAuthLink = onRequest(
       return;
     }
 
+    // Rate limit: this endpoint emails arbitrary addresses and resolves shortCodes,
+    // so cap both per-IP volume and per-email volume.
+    const ip = requestIp(req);
+    const [ipAllowed, emailAllowed] = await Promise.all([
+      checkRateLimit(`deviceauth_ip_${ip}`, 10),
+      checkRateLimit(`deviceauth_email_${email.toLowerCase()}`, 5),
+    ]);
+    if (!ipAllowed || !emailAllowed) {
+      res.status(429).json({ error: 'Too many requests. Please try again later.' });
+      return;
+    }
+
     // If the caller only has the 8-char shortCode, resolve it to a full sessionId here
     // using the admin SDK (bypasses App Check / security rules).
     let resolvedSessionId = sessionId;
     if (!resolvedSessionId && shortCode) {
-      const snap = await admin
+      const normalizedCode = shortCode.toUpperCase();
+      let snap = await admin
         .firestore()
         .collection('deviceSessions')
-        .where('shortCode', '==', shortCode.toUpperCase())
+        .where('shortCode', '==', normalizedCode)
         .where('status', '==', 'pending')
         .limit(1)
         .get();
+
+      // Fallback for sessions displayed by pre-OTA app builds (sessionId-prefix codes)
+      if (snap.empty) {
+        snap = await admin
+          .firestore()
+          .collection('deviceSessions')
+          .where('legacyShortCode', '==', normalizedCode)
+          .where('status', '==', 'pending')
+          .limit(1)
+          .get();
+      }
 
       if (snap.empty) {
         console.warn('[sendDeviceAuthLink] shortCode not found or already used:', shortCode);

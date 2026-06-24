@@ -20,7 +20,10 @@
     "migrateLanguages": "node scripts/migrateLanguages.mjs",
     "migrateCategories": "node scripts/migrateCategories.mjs",
     "migrateToRootProfiles": "node scripts/migrateToRootProfiles.mjs",
+    "migrateNameField": "node scripts/migrateNameField.mjs",
+    "migrateAffiliateShortlinkNames": "node scripts/migrateAffiliateShortlinkNames.mjs",
     "importLeads": "node scripts/importLeads.mjs",
+    "compressOrgLogos": "node scripts/compressOrgLogos.mjs",
     "syncAlgolia": "node lib/functions/syncAlgolia.js",
     "testDL": "adb shell am start -a android.intent.action.VIEW -d 'https://vpk.to/momomop'"
   },
@@ -39,11 +42,14 @@
     "nanoid": "^5.1.5",
     "nodemailer": "^8.0.7",
     "openai": "^4.20.0",
+    "puppeteer": "^25.2.0",
     "qrcode": "^1.5.4",
     "react-qr-code": "^2.0.18",
     "resend": "^6.10.0",
+    "satori": "^0.26.0",
     "sharp": "^0.34.5",
-    "stripe": "^22.0.2"
+    "stripe": "^22.0.2",
+    "svix": "^1.96.0"
   },
   "devDependencies": {
     "@types/nodemailer": "^8.0.0",

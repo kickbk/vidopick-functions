@@ -1,4 +1,5 @@
 import { Storage } from '@google-cloud/storage';
+import { getFirestore } from 'firebase-admin/firestore';
 import { onObjectFinalized } from 'firebase-functions/v2/storage';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -30,8 +31,17 @@ export const compressUploadedImage = onObjectFinalized(
     let targetHeight = 0;
     let format: 'webp' | 'jpeg' = 'webp';
     let folderType = '';
+    let fit: 'cover' | 'inside' = 'cover';
 
-    if (filePath.startsWith('organizations/') && filePath.includes('/ads/')) {
+    if (filePath.startsWith('organizations/logos/')) {
+      // Logos render at ~32pt in the app; raw uploads (multi-megapixel) cause
+      // main-thread resample hangs on older iPhones, so keep them small.
+      folderType = 'LOGO';
+      targetWidth = 256;
+      targetHeight = 256;
+      format = 'webp';
+      fit = 'inside';
+    } else if (filePath.startsWith('organizations/') && filePath.includes('/ads/')) {
       folderType = 'AD';
       targetWidth = 1920;
       targetHeight = 1080;
@@ -41,6 +51,13 @@ export const compressUploadedImage = onObjectFinalized(
       targetWidth = 1200;
       targetHeight = 630;
       format = 'jpeg';
+    } else if (filePath.startsWith('affiliates/') && filePath.endsWith('/photo.jpg')) {
+      // Affiliate profile photos render as small avatars on /vp pages
+      folderType = 'AFFILIATE_PHOTO';
+      targetWidth = 512;
+      targetHeight = 512;
+      format = 'webp';
+      fit = 'inside';
     } else {
       return console.log('Skipping: Path not monitored', filePath);
     }
@@ -72,11 +89,12 @@ export const compressUploadedImage = onObjectFinalized(
       const isPortrait =
         metadata.height && metadata.width ? metadata.height > metadata.width : false;
 
-      // Swap dimensions if portrait to maintain the intended aspect ratio
+      // Swap dimensions if portrait to maintain the intended aspect ratio.
+      // Not needed for 'inside' fit (logos), which already preserves aspect ratio.
       let finalWidth = targetWidth;
       let finalHeight = targetHeight;
 
-      if (isPortrait) {
+      if (isPortrait && fit === 'cover') {
         finalWidth = targetHeight;
         finalHeight = targetWidth;
       }
@@ -88,9 +106,10 @@ export const compressUploadedImage = onObjectFinalized(
       const pipeline = imageInstance
         .rotate() // CRITICAL: Auto-rotates based on EXIF data (fixes sideways phone uploads)
         .resize(finalWidth, finalHeight, {
-          fit: 'cover',
+          fit,
           position: 'center',
-          withoutEnlargement: false,
+          // Never enlarge logos; ads/invites keep their original fill behavior
+          withoutEnlargement: fit === 'inside',
         });
 
       if (format === 'webp') {
@@ -112,6 +131,21 @@ export const compressUploadedImage = onObjectFinalized(
           },
         },
       });
+
+      // --- 6b. For affiliate photos, update the Firestore document so the stored
+      // URL points to the compressed file rather than the original (which gets
+      // deleted below). Path shape: affiliates/{uid}/photo.jpg; uid == authUid.
+      if (folderType === 'AFFILIATE_PHOTO') {
+        const publicUrl = `https://storage.googleapis.com/${bucketName}/${compressedFilePath}`;
+        const uid = filePath.split('/')[1];
+        if (uid) {
+          const db = getFirestore();
+          const snap = await db.collection('affiliates').where('authUid', '==', uid).limit(1).get();
+          if (!snap.empty) {
+            await snap.docs[0].ref.update({ photo: publicUrl });
+          }
+        }
+      }
 
       // --- 7. Cleanup ---
       await bucket.file(filePath).delete();

@@ -6,6 +6,7 @@ import { defineSecret } from 'firebase-functions/params';
 if (!admin.apps.length) admin.initializeApp();
 
 const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
+const stripeSecretKeyTest = defineSecret('STRIPE_SECRET_KEY_TEST');
 
 /**
  * Create a Stripe Billing Portal session for the authenticated user.
@@ -22,7 +23,7 @@ export const createStripePortalSession = onRequest(
     timeoutSeconds: 15,
     invoker: 'public',
     cors: true,
-    secrets: [stripeSecretKey],
+    secrets: [stripeSecretKey, stripeSecretKeyTest],
   },
   async (req, res) => {
     if (req.method !== 'POST') {
@@ -53,14 +54,20 @@ export const createStripePortalSession = onRequest(
     }
 
     const userSnap = await admin.firestore().doc(`users/${uid}`).get();
-    const customerId: string | undefined = userSnap.data()?.stripeCustomerId;
+    const userData = userSnap.data() ?? {};
+    const customerId: string | undefined = userData.stripeCustomerId;
 
     if (!customerId) {
       res.status(400).json({ error: 'No Stripe customer found for this account' });
       return;
     }
 
-    const stripe = new Stripe(stripeSecretKey.value(), { apiVersion: '2026-03-25.dahlia' });
+    // Use the test key if this subscription was created in sandbox mode
+    const isTestMode = userData.testMode === true;
+    const stripe = new Stripe(
+      isTestMode ? stripeSecretKeyTest.value() : stripeSecretKey.value(),
+      { apiVersion: '2026-03-25.dahlia' }
+    );
 
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
