@@ -9,15 +9,19 @@ service firebase.storage {
     }
 
     // Affiliate profile photos — readable by anyone (needed for vidopick.com public pages),
-    // writable only by the authenticated user who owns the path.
-    // The compressUploadedImage function replaces the original .jpg with a
-    // _compressed.webp via the Admin SDK; both paths need public read.
+    // writable only by the authenticated user who owns the path or an admin.
+    // The compressUploadedImage CF compresses and overwrites photo.jpg in place (no rename).
+    // photo_compressed.* rules kept for backward compat with older affiliate uploads.
     match /affiliates/{uid}/photo.jpg {
       allow read: if true;
       allow create, update: if request.auth != null
-        && request.auth.uid == uid
+        && (request.auth.uid == uid || request.auth.token.role == 'admin')
         && isValidImage(10);
-      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow delete: if request.auth != null
+        && (request.auth.uid == uid || request.auth.token.role == 'admin');
+    }
+    match /affiliates/{uid}/photo_compressed.jpg {
+      allow read: if true;
     }
     match /affiliates/{uid}/photo_compressed.webp {
       allow read: if true;

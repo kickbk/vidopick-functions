@@ -371,12 +371,12 @@ service cloud.firestore {
         && request.resource.data.authUid == request.auth.uid
         && request.auth.token.email_verified == true
         && resource.data.email == request.auth.token.email
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authUid']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['authUid', 'claimedAt']);
 
       // Affiliate can update their own profile fields, payout info, and onboarding state
       allow update: if isSignedIn()
         && resource.data.authUid == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paypalEmail', 'payoutMethod', 'photo', 'bio', 'title', 'name', 'website', 'websiteSummary', 'websiteKeywords', 'onboardingCompletedAt', 'affiliateTermsAgreedAt', 'socialLinks']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['paypalEmail', 'payoutMethod', 'photo', 'bio', 'title', 'name', 'website', 'websiteSummary', 'websiteKeywords', 'onboardingCompletedAt', 'affiliateTermsAgreedAt', 'socialLinks', 'claimedAt']);
 
       // publicProfiles subcollection — public read for vidopick.com; created/removed by
       // Cloud Functions (addPublicProfile/removePublicProfile). The owning affiliate may
@@ -459,6 +459,14 @@ service cloud.firestore {
 
     match /outreach_affiliates/{leadId} {
       allow read, write: if isAdmin();
+    }
+
+    // ── collectionGroup: affiliates/*/public ─────────────────────────────────
+    // Allows the /creators/ page to query all public profile docs across all
+    // affiliates without exposing the parent affiliate doc (which holds payout info).
+
+    match /{path=**}/public/{docId} {
+      allow read: if true;
     }
 
     // ── Deny everything else ──────────────────────────────────────────────────
