@@ -4,6 +4,7 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import {
   buildAffiliateSaleEmail,
+  buildAffiliateTrialEmail,
   buildOwnerSaleEmail,
   buildOwnerDirectSaleEmail,
   buildOwnerCancellationEmail,
@@ -19,7 +20,7 @@ const stripeSecretKeyTest = defineSecret('STRIPE_SECRET_KEY_TEST');
 const stripeWebhookSecret = defineSecret('STRIPE_WEBHOOK_SECRET');
 const stripeWebhookSecretTest = defineSecret('STRIPE_WEBHOOK_SECRET_TEST');
 
-const OWNER_EMAIL = 'vidopick@gmail.com';
+const OWNER_EMAIL = 'support@vidopick.com';
 const PARTNER_DASHBOARD_URL = 'https://vidopick.com/vp/dashboard/';
 
 // ── Affiliate commission helpers ──────────────────────────────────────────────
@@ -279,7 +280,9 @@ async function syncFollowerUidsForProChange(
       });
     }
     await batch.commit();
-    console.log(`[syncFollowerUids] uid=${uid} deactivated profiles=${personalFollowedProfileIds.length}`);
+    console.log(
+      `[syncFollowerUids] uid=${uid} deactivated profiles=${personalFollowedProfileIds.length}`
+    );
     return;
   }
 
@@ -571,17 +574,77 @@ export const stripeWebhook = onRequest(
               } catch (emailErr) {
                 console.warn('[stripeWebhook] owner trial-start email failed:', emailErr);
               }
+
+              // Notify the referring affiliate (if any) that a trial started via their link.
+              // Guard: only fire for genuine first trials — prevUserData.stripeActivatedAt is
+              // unset for first-time buyers (read before the update above sets it).
+              const trialAffiliateId: string | undefined =
+                !prevUserData.stripeActivatedAt ? prevUserData.referredByAffiliateId : undefined;
+              if (trialAffiliateId) {
+                try {
+                  const date = new Date().toISOString().slice(0, 10);
+                  const affiliateSnap = await db.doc(`affiliates/${trialAffiliateId}`).get();
+                  const affiliateData = affiliateSnap.data() ?? {};
+                  const affiliateEmail: string = affiliateData.email ?? '';
+                  const affiliateName: string = affiliateData.name ?? 'Affiliate';
+                  await Promise.all([
+                    db
+                      .collection(`affiliates/${trialAffiliateId}/dailyStats`)
+                      .doc(date)
+                      .set({ trials: admin.firestore.FieldValue.increment(1) }, { merge: true }),
+                    db
+                      .doc(`affiliates/${trialAffiliateId}`)
+                      .set(
+                        { stats: { trialStarts: admin.firestore.FieldValue.increment(1) } },
+                        { merge: true }
+                      ),
+                    ...(prevUserData.referredByShortlinkId
+                      ? [
+                          db
+                            .doc(`shortLinks/${prevUserData.referredByShortlinkId}`)
+                            .set(
+                              { analytics: { trialConversions: admin.firestore.FieldValue.increment(1) } },
+                              { merge: true }
+                            ),
+                        ]
+                      : []),
+                  ]);
+                  const RESEND_API_KEY = process.env.RESEND_API_KEY;
+                  const sendTestEmails = process.env.SEND_TEST_EMAILS === 'true';
+                  if (RESEND_API_KEY && affiliateEmail && (!isTestMode || sendTestEmails)) {
+                    const { Resend } = await import('resend');
+                    const resend = new Resend(RESEND_API_KEY);
+                    await resend.emails.send({
+                      from: 'Vidopick <hello@vidopick.com>',
+                      to: affiliateEmail,
+                      subject: `${isTestMode ? '[TEST] ' : ''}🌱 New free trial via your link`,
+                      html: buildAffiliateTrialEmail(
+                        affiliateName,
+                        interval,
+                        'https://vidopick.com/vp/dashboard'
+                      ),
+                    });
+                    console.log(`[stripeWebhook] affiliate trial email sent affiliateId=${trialAffiliateId} uid=${uid}`);
+                  }
+                } catch (e) {
+                  console.warn('[stripeWebhook] affiliate trial notification failed:', e);
+                }
+              }
             } else {
               // Affiliate commission: attribute first payment if referral not yet locked
               if (isResubscription) {
                 // Re-subscription after cancellation: no new commission — the affiliate
                 // was already paid on original conversion. Just restore their active count.
                 if (prevUserData.referredByAffiliateId) {
-                  await db.doc(`affiliates/${prevUserData.referredByAffiliateId}`).set(
-                    { stats: { activeSubscribers: admin.firestore.FieldValue.increment(1) } },
-                    { merge: true }
+                  await db
+                    .doc(`affiliates/${prevUserData.referredByAffiliateId}`)
+                    .set(
+                      { stats: { activeSubscribers: admin.firestore.FieldValue.increment(1) } },
+                      { merge: true }
+                    );
+                  console.log(
+                    `[stripeWebhook] re-subscription: activeSubscribers +1 affiliateId=${prevUserData.referredByAffiliateId} uid=${uid}`
                   );
-                  console.log(`[stripeWebhook] re-subscription: activeSubscribers +1 affiliateId=${prevUserData.referredByAffiliateId} uid=${uid}`);
                 }
               } else {
                 await createAffiliateCommission(db, uid, amountTotal, subscription ?? '', {
@@ -742,10 +805,9 @@ export const stripeWebhook = onRequest(
               // Free trial cancelled — revoke Pro access immediately (no paid period to honour).
               // Keep the profile relationship intact so a resubscription restores access.
               await Promise.all([
-                db.doc(`users/${uid2}`).set(
-                  { proStatus: 'none', proType: null, proCancelOn: null },
-                  { merge: true }
-                ),
+                db
+                  .doc(`users/${uid2}`)
+                  .set({ proStatus: 'none', proType: null, proCancelOn: null }, { merge: true }),
                 db.doc(`subscriptions/${subscription.id}`).set(
                   {
                     status: 'cancelled',
@@ -880,9 +942,16 @@ export const stripeWebhook = onRequest(
             ]);
             if (isCancellingTrial) {
               await syncFollowerUidsForProChange(db, uid2, 'deactivate').catch((e) =>
-                console.warn('[stripeWebhook] deactivate followerUids (cancelling trial) failed:', e)
+                console.warn(
+                  '[stripeWebhook] deactivate followerUids (cancelling trial) failed:',
+                  e
+                )
               );
-            } else if (proStatus2 === 'active' && prevAttrs.status && prevAttrs.status !== 'active') {
+            } else if (
+              proStatus2 === 'active' &&
+              prevAttrs.status &&
+              prevAttrs.status !== 'active'
+            ) {
               // Status just changed to active from something else (e.g. incomplete → active after
               // payment confirmation). Reactivate followers that were paused during a prior lapse.
               await syncFollowerUidsForProChange(db, uid2, 'reactivate').catch((e) =>
@@ -1031,11 +1100,15 @@ export const stripeWebhook = onRequest(
           // Re-subscription: restore affiliate's active subscriber count.
           // No new commission — the affiliate was already paid on original conversion.
           if (newSubData.referredByAffiliateId && newSubData.referralLockedAt) {
-            await db.doc(`affiliates/${newSubData.referredByAffiliateId}`).set(
-              { stats: { activeSubscribers: admin.firestore.FieldValue.increment(1) } },
-              { merge: true }
+            await db
+              .doc(`affiliates/${newSubData.referredByAffiliateId}`)
+              .set(
+                { stats: { activeSubscribers: admin.firestore.FieldValue.increment(1) } },
+                { merge: true }
+              );
+            console.log(
+              `[stripeWebhook] portal re-subscription: activeSubscribers +1 affiliateId=${newSubData.referredByAffiliateId} uid=${newSubUid}`
             );
-            console.log(`[stripeWebhook] portal re-subscription: activeSubscribers +1 affiliateId=${newSubData.referredByAffiliateId} uid=${newSubUid}`);
           }
 
           const newSubDeviceTokens: string[] = newSubData.deviceTokens ?? [];
@@ -1051,7 +1124,10 @@ export const stripeWebhook = onRequest(
           }
 
           await syncFollowerUidsForProChange(db, newSubUid, 'reactivate').catch((e) =>
-            console.warn('[stripeWebhook] reactivate followerUids (portal re-subscription) failed:', e)
+            console.warn(
+              '[stripeWebhook] reactivate followerUids (portal re-subscription) failed:',
+              e
+            )
           );
           console.log(
             `[stripeWebhook] customer.subscription.created (portal re-subscription) uid=${newSubUid} status=${newSubStripeStatus}`
@@ -1086,7 +1162,10 @@ export const stripeWebhook = onRequest(
               .set({ status: 'cancelled', cancelledAt }, { merge: true }),
           ]);
           await syncFollowerUidsForProChange(db, uid, 'deactivate').catch((e) =>
-            console.warn('[stripeWebhook] deactivate followerUids (subscription deleted) failed:', e)
+            console.warn(
+              '[stripeWebhook] deactivate followerUids (subscription deleted) failed:',
+              e
+            )
           );
           console.log(`[stripeWebhook] subscription deleted uid=${uid}`);
 
@@ -1249,6 +1328,8 @@ export const stripeWebhook = onRequest(
           // If the trial was shortened to "now", payment may have already been
           // collected and the subscription is already active — skip the notification.
           if (subscription.status !== 'trialing') break;
+          // If the user already cancelled during the trial, don't tell them their card will be charged.
+          if (subscription.cancel_at_period_end) break;
 
           const trialEndSeconds: number = subscription.trial_end ?? 0;
           const trialEndDate = new Date(trialEndSeconds * 1000).toLocaleDateString('en-US', {

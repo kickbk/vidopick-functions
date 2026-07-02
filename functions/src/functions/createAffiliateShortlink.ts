@@ -25,6 +25,7 @@ export const createAffiliateShortlink = onCall(
       profileId,
       platforms,
       sandboxMode: sandboxRequested,
+      isProfileShareLink,
     } = (request.data ?? {}) as {
       affiliateId?: string;
       label?: string;
@@ -33,11 +34,12 @@ export const createAffiliateShortlink = onCall(
       profileId?: string;
       platforms?: string[];
       sandboxMode?: boolean;
+      isProfileShareLink?: boolean;
     };
 
     const sandboxMode = sandboxRequested === true && isAdmin;
 
-    if (!label?.trim()) throw new HttpsError('invalid-argument', 'label is required');
+    if (!isProfileShareLink && !label?.trim()) throw new HttpsError('invalid-argument', 'label is required');
     if (slug && RESERVED_SLUGS.has(slug)) {
       throw new HttpsError('invalid-argument', 'That slug is reserved');
     }
@@ -85,10 +87,27 @@ export const createAffiliateShortlink = onCall(
       }
     }
 
+    // Profile share link: one per affiliate, idempotent
+    if (isProfileShareLink) {
+      const existingId = affiliateData.profileShareShortlinkId as string | undefined;
+      if (existingId) {
+        const existing = await db.doc(`shortLinks/${existingId}`).get();
+        if (existing.exists) {
+          return {
+            shortlinkId: existingId,
+            shortUrl: `https://vpk.to/${existingId}`,
+            stripeCouponId: existing.data()?.stripeCouponId ?? null,
+          };
+        }
+      }
+    }
+
     const discountPercent: number = affiliateData.discountPercent ?? 0;
     const stripe = new Stripe(sandboxMode ? stripeSecretKeyTest.value() : stripeSecretKey.value(), {
       apiVersion: '2026-03-25.dahlia',
     });
+
+    const effectiveLabel = isProfileShareLink ? 'Profile Page' : label!.trim();
 
     // Create Stripe coupon if a discount is configured.
     // Discount applies to the subscriber's first 12 months only (first annual invoice,
@@ -99,8 +118,8 @@ export const createAffiliateShortlink = onCall(
         percent_off: discountPercent,
         duration: 'repeating',
         duration_in_months: 12,
-        name: label.trim(),
-        metadata: { affiliateId, label: label.trim() },
+        name: effectiveLabel,
+        metadata: { affiliateId, label: effectiveLabel },
       });
       stripeCouponId = coupon.id;
     }
@@ -108,12 +127,37 @@ export const createAffiliateShortlink = onCall(
     // Build shortlink params
     const params: Record<string, any> = {};
 
-    if (playlistIds?.length) {
+    if (!isProfileShareLink && playlistIds?.length) {
       params.playlists = playlistIds.filter(Boolean);
     }
 
     let resolvedProfileId: string | undefined;
-    if (profileId) {
+    if (isProfileShareLink) {
+      // Attach the affiliate's primary public profile so the mobile app can show a follow invite
+      const pubProfilesSnap = await db
+        .collection(`affiliates/${affiliateId}/publicProfiles`)
+        .limit(1)
+        .get();
+      if (!pubProfilesSnap.empty) {
+        const pubEntry = pubProfilesSnap.docs[0].data();
+        const pId = pubEntry.profileId as string | undefined;
+        if (pId) {
+          const profileSnap = await db.doc(`profiles/${pId}`).get();
+          if (profileSnap.exists) {
+            const pd = profileSnap.data()!;
+            params.profile = {
+              uid: pd.uid,
+              profileId: pId,
+              displayName: pd.name ?? affiliateData.name,
+              color: pd.color ?? 'blue',
+              playlistIds: pd.playlistIds ?? [],
+            };
+            params.name = affiliateData.name;
+            resolvedProfileId = pId;
+          }
+        }
+      }
+    } else if (profileId) {
       const profileSnap = await db.doc(`profiles/${profileId}`).get();
       if (profileSnap.exists) {
         const profileData = profileSnap.data()!;
@@ -134,14 +178,25 @@ export const createAffiliateShortlink = onCall(
       }
     }
 
-    // Create shortlink — use supplied slug or auto-generate
-    const shortlinkRef = slug
-      ? db.collection('shortLinks').doc(slug)
-      : db.collection('shortLinks').doc();
+    // Create shortlink
+    let shortlinkRef: admin.firestore.DocumentReference;
+    if (isProfileShareLink) {
+      if (!affiliateData.slug) {
+        throw new HttpsError(
+          'failed-precondition',
+          'Claim your public URL before generating a profile share link.'
+        );
+      }
+      shortlinkRef = db.collection('shortLinks').doc(`a_${affiliateData.slug}`);
+    } else if (slug) {
+      shortlinkRef = db.collection('shortLinks').doc(slug);
+    } else {
+      shortlinkRef = db.collection('shortLinks').doc();
+    }
 
-    const docData = {
-      linkTitle: `${affiliateData.name} – ${label.trim()}`,
-      label: label.trim(),
+    const docData: Record<string, any> = {
+      linkTitle: `${affiliateData.name} – ${effectiveLabel}`,
+      label: effectiveLabel,
       linkType: 'referral',
       affiliateId,
       stripeCouponId,
@@ -151,13 +206,16 @@ export const createAffiliateShortlink = onCall(
       redirect: {
         ios: null,
         android: null,
-        desktop: 'https://vidopick.com/get/',
+        // For profile share links the desktop redirect is set after creation (needs the doc ID).
+        // For regular links, send to /get/ and let handleDeeplink append params.
+        desktop: isProfileShareLink ? 'https://vidopick.com/get/' : 'https://vidopick.com/get/',
         webOnly: false,
       },
       params,
       analytics: {},
       meta: {},
       platforms: Array.isArray(platforms) ? platforms.filter(Boolean) : [],
+      ...(isProfileShareLink && { isProfileShareLink: true }),
     };
 
     if (slug) {
@@ -174,6 +232,20 @@ export const createAffiliateShortlink = onCall(
       await shortlinkRef.set(docData);
     }
 
+    // For profile share links, update redirect.desktop to include ?ref={shortlinkId}
+    // so the profile page receives attribution when visited via this link.
+    if (isProfileShareLink) {
+      await shortlinkRef.update({
+        'redirect.desktop': `https://vidopick.com/vp/${affiliateId}?ref=${shortlinkRef.id}`,
+      });
+      await db
+        .doc(`affiliates/${affiliateId}`)
+        .set({ profileShareShortlinkId: shortlinkRef.id }, { merge: true })
+        .catch((e) =>
+          console.warn('[createAffiliateShortlink] profileShareShortlinkId write failed:', e)
+        );
+    }
+
     // Mark the attached profile as shared so requestProfileFollow can approve follows.
     // Only write if not already shared — don't overwrite an existing canonical inviteId.
     if (resolvedProfileId) {
@@ -186,7 +258,7 @@ export const createAffiliateShortlink = onCall(
     }
 
     console.log(
-      `[createAffiliateShortlink] created shortlinkId=${shortlinkRef.id} affiliateId=${affiliateId} couponId=${stripeCouponId}`
+      `[createAffiliateShortlink] created shortlinkId=${shortlinkRef.id} affiliateId=${affiliateId} couponId=${stripeCouponId} isProfileShareLink=${!!isProfileShareLink}`
     );
 
     return {

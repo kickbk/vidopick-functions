@@ -1,7 +1,7 @@
 /**
- * Firebase Cloud Function to refresh playlist metadata
+ * Firebase Cloud Function to refresh playlist/channel metadata
  *
- * Checks playlist thumbnails and updates metadata from YouTube XML feeds
+ * Checks playlist/channel thumbnails and updates metadata from YouTube XML feeds
  * - Verifies existing thumbnails are still valid
  * - Fetches new thumbnails and titles if changed
  * - Marks playlists as removed if feed returns 404
@@ -100,7 +100,7 @@ async function fetchPlaylistMetadata(playlistId: string): Promise<{
 }
 
 /**
- * Send email notification about playlist changes
+ * Send email notification about playlist/channel changes
  */
 async function sendNotificationEmail(
   updates: PlaylistChange[],
@@ -141,7 +141,7 @@ async function sendNotificationEmail(
               <br/>
               <span style="color: #666; font-size: 14px;">${changes.join(' | ')}</span>
               <br/>
-              <a href="https://youtube.com/playlist?list=${change.id}" style="color: #0066cc; font-size: 12px;">View Playlist</a>
+              <a href="https://youtube.com/playlist?list=${change.id}" style="color: #0066cc; font-size: 12px;">View Playlist/Channel</a>
               ${change.newThumbnail ? `<br/><a href="${change.newThumbnail}" style="color: #0066cc; font-size: 12px;">View Thumbnail</a>` : ''}
             </li>
           `;
@@ -162,7 +162,7 @@ async function sendNotificationEmail(
           <li style="margin: 10px 0; padding: 10px; background-color: #fff3f3; border-radius: 5px;">
             <strong>${title}</strong> (${id})
             <br/>
-            <span style="color: #999; font-size: 12px;">Playlist deleted or suspended</span>
+            <span style="color: #999; font-size: 12px;">Playlist or channel deleted or suspended</span>
           </li>
         `
           )
@@ -174,16 +174,16 @@ async function sendNotificationEmail(
   try {
     await resend.emails.send({
       from: 'Vidopick <hello@vidopick.com>',
-      to: 'hello@vidopick.com',
-      subject: `Vidopick Playlist Changes Detected - ${updates.length} Updated, ${removals.length} Removed`,
+      to: 'info@vidopick.com',
+      subject: `Vidopick Content Changes Detected - ${updates.length} Updated, ${removals.length} Removed`,
       html: `
       <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
         <h2 style="color: #333; border-bottom: 2px solid #0066cc; padding-bottom: 10px;">
-          Vidopick Playlist Metadata Changes
+          Vidopick Metadata Changes
         </h2>
 
         <p style="color: #666;">
-          Detected changes in playlist metadata at ${new Date().toLocaleString()}
+          Detected changes in playlist or channel metadata at ${new Date().toLocaleString()}
         </p>
 
         ${updatesHtml}
@@ -192,7 +192,7 @@ async function sendNotificationEmail(
         <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;" />
 
         <p style="color: #999; font-size: 12px;">
-          This is an automated notification from Vidopick's playlist refresh system.
+          This is an automated notification from Vidopick's content refresh system.
         </p>
       </div>
     `,
@@ -265,12 +265,12 @@ export const refreshPlaylistMetadata = onRequest(
         const playlistId = playlistIds[i];
 
         try {
-          // Fetch existing playlist data from Firestore
+          // Fetch existing playlist/channel data from Firestore
           const docRef = db.collection('scannedPlaylists').doc(playlistId);
           const doc = await docRef.get();
 
           if (!doc.exists) {
-            console.log(`Playlist ${playlistId} not found in database, skipping`);
+            console.log(`Playlist or Channel ${playlistId} not found in database, skipping`);
             continue;
           }
 
@@ -300,7 +300,7 @@ export const refreshPlaylistMetadata = onRequest(
 
           // Step 3: Check if playlist was removed
           if (!metadata.exists) {
-            console.log(`Playlist ${playlistId} was removed`);
+            console.log(`Playlist or Channel ${playlistId} was removed`);
 
             // Mark as removed in Firestore
             await docRef.update({
@@ -369,7 +369,10 @@ export const refreshPlaylistMetadata = onRequest(
             result.unchanged.push(playlistId);
           }
         } catch (error: any) {
-          console.error(`Error processing playlist ${playlistId}:`, error.message);
+          console.error(
+            `Error processing playlist or channel with ID ${playlistId}:`,
+            error.message
+          );
           // Continue with next playlist instead of failing entire batch
         }
 

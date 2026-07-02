@@ -1,7 +1,7 @@
 import { Resend } from 'resend';
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const NOTIFY_EMAIL = 'hello@vidopick.com';
+const NOTIFY_EMAIL = 'support@vidopick.com';
 
 /**
  * Sends a demo session notification to hello@vidopick.com via Resend.

@@ -82,7 +82,7 @@ export const sendSupportEmail = onRequest({ cors: true }, async (request, respon
     // Email to you (the support team)
     await resend.emails.send({
       from: 'Vidopick <hello@vidopick.com>',
-      to: 'hello@vidopick.com',
+      to: 'support@vidopick.com',
       replyTo: email.trim(),
       subject: `Vidopick Support Request from ${name.trim().replace(/[\r\n]+/g, ' ')}`,
       html: `

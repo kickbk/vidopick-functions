@@ -285,7 +285,7 @@ export function buildEmailChangeNotificationEmail(
 
             <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
               This revert link expires in 7 days. After that, contact us at
-              <a href="mailto:vidopickhelp@gmail.com" style="color:#94a3b8;">vidopickhelp@gmail.com</a>
+              <a href="mailto:support@vidopick.com" style="color:#94a3b8;">support@vidopick.com</a>
               if you need help recovering your account.
             </p>
           </td>
@@ -1194,7 +1194,7 @@ export function buildAffiliateWelcomeEmail(
 
             <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px;" />
             <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
-              Questions? <a href="mailto:vidopickhelp@gmail.com" style="color:#4470ad;text-decoration:underline;">Reach out to us</a>
+              Questions? <a href="mailto:support@vidopick.com" style="color:#4470ad;text-decoration:underline;">Reach out to us</a>
             </p>
           </td>
         </tr>
@@ -1379,6 +1379,94 @@ export function buildOwnerTrialStartEmail(
 </html>`;
 }
 
+export function buildAffiliateTrialEmail(
+  affiliateName: string,
+  subscriptionType: string,
+  dashboardUrl: string
+): string {
+  const year = new Date().getFullYear();
+  const planLabel = subscriptionType === 'year' ? 'Pro Annual' : 'Pro Monthly';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New free trial via your link!</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+
+        <tr>
+          <td style="background-color:#0b172a;border-radius:20px 20px 0 0;padding:40px 32px 32px;text-align:center;">
+            <p style="margin:0 0 16px;"><span style="${LOGO_STYLE}color:#ffffff;">Vidopick</span></p>
+            <p style="margin:0;font-size:40px;">🌱</p>
+            <h1 style="margin:12px 0 0;font-size:28px;font-weight:800;color:#ffffff;line-height:1.2;">New trial via your link!</h1>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:0 0 20px 20px;padding:32px 40px 40px;box-shadow:0 8px 24px -4px rgba(0,0,0,0.10);">
+            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${esc(affiliateName)},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#334155;line-height:1.7;">
+              Someone just signed up for a <strong>14-day free trial</strong> of Vidopick Pro through your referral link.
+            </p>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="width:100%;background:#f8fafc;border-radius:14px;padding:20px 24px;margin-bottom:28px;">
+              <tr>
+                <td style="padding:6px 0;font-size:14px;color:#64748b;">Plan</td>
+                <td style="padding:6px 0;font-size:14px;color:#0f172a;font-weight:600;text-align:right;">Vidopick ${planLabel}</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;font-size:14px;color:#64748b;">Trial length</td>
+                <td style="padding:6px 0;font-size:14px;color:#0f172a;font-weight:600;text-align:right;">14 days</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 0;font-size:14px;color:#64748b;">Your commission</td>
+                <td style="padding:6px 0;font-size:14px;color:#f59e0b;font-weight:700;text-align:right;">Pending — paid if they stay</td>
+              </tr>
+            </table>
+
+            <p style="margin:0 0 28px;font-size:14px;color:#64748b;line-height:1.7;">
+              Once their trial converts to a paid subscription, your commission will be credited to your account. You'll get another email when that happens.
+            </p>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 32px;">
+              <tr>
+                <td style="background-color:#1d4ed8;border-radius:10px;">
+                  <a href="${dashboardUrl}"
+                     style="display:inline-block;padding:14px 32px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.01em;white-space:nowrap;">
+                    View Dashboard &rarr;
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px;" />
+            <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
+              Commissions are held for 30 days before approval. Approved amounts over $25 are paid monthly via PayPal.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding-top:24px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              &copy; ${year} Vidopick &middot;
+              <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
 export function buildOwnerCancellationEmail(
   customerName: string,
   customerEmail: string,
@@ -1510,6 +1598,178 @@ export function buildSignInEmail(signInLink: string): string {
 
             <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
               This link expires in 1 hour. If you didn't request this, you can safely ignore this email.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding-top:24px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              &copy; ${year} Vidopick &middot;
+              <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export function buildAffiliateInviteEmail(name: string, email: string, magicLink: string): string {
+  const year = new Date().getFullYear();
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>You're invited to Vidopick affiliates</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <div style="max-width:560px;margin:48px auto;padding:0 16px;color:#1e293b;background:#f1f5f9">
+
+    <!-- Logo -->
+    <div style="padding:0 0 32px;text-align:center;">
+      <span style="${LOGO_STYLE}">Vidopick</span>
+    </div>
+
+    <!-- Card -->
+    <div style="background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
+      <h1 style="font-size:24px;font-weight:700;margin:0 0 8px;color:#0f172a">Hi ${esc(name)}!</h1>
+      <p style="font-size:15px;line-height:1.65;color:#475569;margin:0 0 32px">
+        You've been invited to join the <strong style="color:#1e293b">Vidopick Affiliate Program</strong>.
+        Here's how to get started. We'll guide you through each step once you're in.
+      </p>
+
+      <!-- Step 1 -->
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:20px">
+        <div style="background:#dbeafe;color:#1d4ed8;width:28px;height:28px;border-radius:50%;font-weight:700;font-size:13px;flex-shrink:0;line-height:28px;text-align:center">1</div>
+        <div>
+          <p style="font-weight:600;font-size:15px;color:#1e293b;margin:0 0 6px">Download Vidopick</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <a href="https://apps.apple.com/us/app/vidopick/id6749210639" style="display:inline-flex;align-items:center;gap:8px;background:#000;border:1px solid #334155;color:#fff;text-decoration:none;padding:8px 14px;border-radius:10px">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+              <span style="text-align:left;line-height:1.2"><span style="display:block;font-size:10px;color:#94a3b8">Download on the</span><span style="display:block;font-size:13px;font-weight:600">App Store</span></span>
+            </a>
+            <a href="https://play.google.com/store/apps/details?id=com.vidopick.app" style="display:inline-flex;align-items:center;gap:8px;background:#000;border:1px solid #334155;color:#fff;text-decoration:none;padding:8px 14px;border-radius:10px">
+              <svg width="18" height="18" viewBox="0 0 24 24"><path d="M3.18 23.76A2 2 0 0 1 2 22V2a2 2 0 0 1 1.18-1.76l11.31 11.75L3.18 23.76z" fill="#00C6FB"/><path d="M20.09 10.53l-2.5-1.45L14.49 12l3.1 2.92 2.5-1.45a2 2 0 0 0 0-2.94z" fill="#FFD200"/><path d="M3.18 23.76L14.49 12 17.59 14.92 5.5 21.9a2 2 0 0 1-2.32 1.86z" fill="#FF5C78"/><path d="M3.18.24A2 2 0 0 1 5.5 2.1l12.09 6.98L14.49 12 3.18.24z" fill="#00E87C"/></svg>
+              <span style="text-align:left;line-height:1.2"><span style="display:block;font-size:10px;color:#94a3b8">Get it on</span><span style="display:block;font-size:13px;font-weight:600">Google Play</span></span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2 -->
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:20px">
+        <div style="background:#dbeafe;color:#1d4ed8;width:28px;height:28px;border-radius:50%;font-weight:700;font-size:13px;flex-shrink:0;line-height:28px;text-align:center">2</div>
+        <div style="flex:1">
+          <p style="font-weight:600;font-size:15px;color:#1e293b;margin:0 0 8px">Sign into Vidopick with your email address</p>
+          <div style="background:#eff6ff;border:2px solid #bfdbfe;border-radius:10px;padding:12px 16px;font-family:monospace;font-size:15px;color:#1d4ed8;font-weight:600;text-align:center;letter-spacing:0.02em">
+            ${esc(email)}
+          </div>
+          <p style="font-size:13px;color:#64748b;margin:8px 0 0;line-height:1.5">
+            You'll be approved as <strong>Pro</strong> automatically for free.
+          </p>
+        </div>
+      </div>
+
+      <!-- Step 3 -->
+      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:32px">
+        <div style="background:#dbeafe;color:#1d4ed8;width:28px;height:28px;border-radius:50%;font-weight:700;font-size:13px;flex-shrink:0;line-height:28px;text-align:center">3</div>
+        <div>
+          <p style="font-weight:600;font-size:15px;color:#1e293b;margin:0 0 10px">Access your Affiliate Dashboard</p>
+          <table cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td style="background-color:#1d4ed8;border-radius:9px;">
+                <a href="${esc(magicLink)}" style="display:inline-block;padding:13px 24px;font-size:15px;font-weight:600;color:#fff;text-decoration:none;">
+                  Open your Dashboard &rarr;
+                </a>
+              </td>
+            </tr>
+          </table>
+          <p style="font-size:12px;color:#94a3b8;margin:10px 0 0">Link expires in 24 hours.</p>
+        </div>
+      </div>
+
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px;" />
+
+      <p style="font-size:12px;color:#94a3b8;margin:0;line-height:1.6">
+        The Vidopick Team &middot; If you weren't expecting this email, you can ignore it.<br/>
+        If the button doesn't work: <a href="${esc(magicLink)}" style="color:#3b82f6;word-break:break-all">${esc(magicLink)}</a>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding-top:24px;text-align:center;">
+      <p style="margin:0;font-size:12px;color:#94a3b8;">
+        &copy; ${year} Vidopick &middot;
+        <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a>
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>`;
+}
+
+export function buildAffiliateEmailUpdatedEmail(
+  name: string,
+  oldEmail: string,
+  newEmail: string
+): string {
+  const year = new Date().getFullYear();
+  const firstName = name.split(' ')[0] || name;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your Vidopick affiliate email has been updated</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+
+        <tr>
+          <td style="padding-bottom:32px;text-align:center;">
+            <span style="${LOGO_STYLE}">Vidopick</span>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
+            <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">Email address updated</h1>
+            <p style="margin:0 0 8px;font-size:15px;color:#64748b;line-height:1.6;">Hi ${esc(firstName)},</p>
+            <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7;">
+              Your Vidopick affiliate account email has been updated from
+              <strong>${esc(oldEmail)}</strong> to <strong>${esc(newEmail)}</strong>.
+            </p>
+            <p style="margin:0 0 32px;font-size:15px;color:#334155;line-height:1.7;">
+              Use this address to sign in to your affiliate dashboard going forward.
+              Any active sessions have been signed out for your security.
+            </p>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 32px;">
+              <tr>
+                <td style="background-color:#1d4ed8;border-radius:10px;">
+                  <a href="https://vidopick.com/vp/login/"
+                     style="display:inline-block;padding:15px 36px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.01em;white-space:nowrap;">
+                    Sign in to Dashboard &rarr;
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px;" />
+
+            <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
+              If you didn't request this change, contact us immediately at
+              <a href="mailto:support@vidopick.com" style="color:#94a3b8;">support@vidopick.com</a>.
             </p>
           </td>
         </tr>

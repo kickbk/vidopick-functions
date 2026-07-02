@@ -9,6 +9,7 @@ export interface VpProfileEntry {
   profileName: string;
   profileColor: string;
   description: string;
+  thumbnails?: string[];
 }
 
 export interface VpAffiliateProfile {
@@ -45,9 +46,13 @@ function displayDomain(url: string): string {
   }
 }
 
-function socialHandleLabel(url: string): string {
+function socialHandleLabel(url: string, platform?: string): string {
   try {
     const parsed = new URL(url.startsWith('http') ? url : `https://${url}`);
+    if (platform === 'linkedin')
+      return parsed.pathname.replace(/^\/in\//, '').replace(/\/$/, '') || parsed.hostname;
+    if (platform === 'substack')
+      return parsed.hostname.replace(/\.substack\.com$/, '').replace(/^www\./, '');
     const handle = parsed.pathname.replace(/^\/(@?)/, '$1') || parsed.hostname;
     return handle.length > 24 ? parsed.hostname.replace(/^www\./, '') : handle;
   } catch {
@@ -120,9 +125,18 @@ export function generateProfileHtml(
   const cards = entries
     .map((e) => {
       const svg = qrSvg(`https://vpk.to/${e.shortlinkId}`);
+      const thumbs = e.thumbnails ?? [];
+      let thumbStrip = '';
+      if (thumbs.length > 0) {
+        const imgs = thumbs.map((src) => `<img src="${esc(src)}" alt="" loading="lazy" />`).join('');
+        thumbStrip = thumbs.length >= 3
+          ? `<div class="thumbs thumbs-overflow">${imgs}<div class="thumb-ghost"></div><div class="thumb-fade"></div></div>`
+          : `<div class="thumbs">${imgs}</div>`;
+      }
       return `
     <div class="card" style="border-top:3px solid ${esc(e.profileColor)}">
       <div class="card-body">
+        ${thumbStrip}
         <div class="plabel">
           <span class="dot" style="background:${esc(e.profileColor)}"></span>
           <span class="pname">${esc(e.profileName)}</span>
@@ -132,7 +146,7 @@ export function generateProfileHtml(
           <div class="qr-box">${svg}</div>
           <p class="qr-hint">Scan to get this profile in Vidopick</p>
         </div>
-        <button class="get-btn" onclick="handleGet()">Get Vidopick →</button>
+        <a class="get-btn" href="https://vpk.to/${esc(e.shortlinkId)}">Get on Vidopick</a>
       </div>
     </div>`;
     })
@@ -148,7 +162,7 @@ export function generateProfileHtml(
   }
   for (const sl of (profile.socialLinks ?? [])) {
     const icon = SOCIAL_ICONS[sl.platform] ?? GLOBE_SVG;
-    linkPills.push(`<a class="site-link" href="${esc(ensureHttps(sl.url))}" target="_blank" rel="noopener noreferrer">${icon}${esc(socialHandleLabel(sl.url))}</a>`);
+    linkPills.push(`<a class="site-link" href="${esc(ensureHttps(sl.url))}" target="_blank" rel="noopener noreferrer">${icon}${esc(socialHandleLabel(sl.url, sl.platform))}</a>`);
   }
   const linksPart = linkPills.length > 0
     ? `<div class="links">${linkPills.join('')}</div>`
@@ -168,7 +182,19 @@ export function generateProfileHtml(
          <h2 class="section-title">My recommended profiles</h2>
          <p class="section-sub">Scan a QR code or tap the button to get Vidopick and follow my profile. Once you subscribe, any updates I make will automatically appear in your Vidopick.</p>
        </div>
-       <div class="grid">${cards}</div>`
+       <div class="grid">${cards}</div>
+       <div class="store-section">
+         <p class="store-label">Get the Vidopick App</p>
+         <p class="store-sub">Watch safely anywhere: phone, tablet, or TV.</p>
+         <div class="store-badges">
+           <a href="${IOS_STORE}" target="_blank" rel="noopener noreferrer">
+             <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" alt="Download on the App Store" />
+           </a>
+           <a href="${ANDROID_STORE}" target="_blank" rel="noopener noreferrer">
+             <img src="https://upload.wikimedia.org/wikipedia/commons/7/78/Google_Play_Store_badge_EN.svg" alt="Get it on Google Play" />
+           </a>
+         </div>
+       </div>`
     : '';
 
   const themeInitScript = `(function(){
@@ -178,26 +204,6 @@ export function generateProfileHtml(
   })();`;
 
   const platformScript = `
-    (function(){
-      var f=sessionStorage.getItem('vpk_open_fallback');
-      if(f){sessionStorage.removeItem('vpk_open_fallback');window.location.replace(f);return;}
-    })();
-    function handleGet(){
-      var ua=navigator.userAgent||'';
-      var android=/Android/i.test(ua);
-      var ipadOS=/Macintosh/i.test(ua)&&navigator.maxTouchPoints>1;
-      var iphone=/iPhone|iPad|iPod/i.test(ua)||ipadOS;
-      if(android){window.location.href='${ANDROID_STORE}';}
-      else if(iphone){window.location.href='${IOS_STORE}';}
-      else{
-        sessionStorage.setItem('vpk_open_fallback','${IOS_STORE}');
-        window.location.href='vidopick://';
-        setTimeout(function(){
-          sessionStorage.removeItem('vpk_open_fallback');
-          if(!document.hidden){window.location.href='${IOS_STORE}';}
-        },1500);
-      }
-    }
     function toggleTheme(){
       var next=document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
       document.documentElement.setAttribute('data-theme',next);
@@ -283,12 +289,25 @@ h1{font-size:2rem;font-weight:700;letter-spacing:-.025em;line-height:1.2}
 .dot{width:.625rem;height:.625rem;border-radius:9999px;flex-shrink:0}
 .pname{font-size:.875rem;font-weight:600}
 .desc{font-size:.875rem;line-height:1.6;color:var(--muted)}
+.thumbs{display:flex;gap:.375rem;margin-bottom:.25rem}
+.thumbs img{flex:1;min-width:0;border-radius:.5rem;object-fit:cover;aspect-ratio:16/9;display:block}
+.thumbs-overflow{overflow:hidden;position:relative}
+.thumbs-overflow img{flex:0 0 30%;min-width:0}
+.thumb-ghost{flex:0 0 2.5rem;min-width:2.5rem;border-radius:.5rem;background:var(--border);align-self:stretch}
+.thumb-fade{position:absolute;inset-y:0;right:0;width:3.5rem;background:linear-gradient(to left,var(--surface),transparent);pointer-events:none}
 .qr-wrap{display:flex;flex-direction:column;align-items:center;gap:.5rem;padding:.5rem 0}
 .qr-box{width:11rem;height:11rem;border-radius:1rem;overflow:hidden;background:#fff;padding:.375rem;box-shadow:0 0 0 1px var(--border)}
 .qr-box svg{width:100%;height:100%;display:block}
 .qr-hint{font-size:.6875rem;color:var(--faint)}
-.get-btn{margin-top:auto;width:100%;background:var(--blue);color:#fff;border:none;border-radius:.75rem;padding:.625rem 1rem;font-size:.875rem;font-weight:600;cursor:pointer;transition:background .15s}
+.get-btn{margin-top:auto;display:block;width:11rem;align-self:center;text-align:center;text-decoration:none;background:var(--blue);color:#fff;border:none;border-radius:.75rem;padding:.625rem 1rem;font-size:.875rem;font-weight:600;cursor:pointer;transition:background .15s}
 .get-btn:hover{background:var(--blue-h)}
+@media(min-width:640px){.get-btn{display:none}}
+.store-section{display:none;text-align:center;margin-top:2.5rem;border-top:1px solid var(--border);padding-top:2.5rem}
+@media(min-width:640px){.store-section{display:block}}
+.store-label{font-size:1rem;font-weight:600;color:var(--text)}
+.store-sub{font-size:.875rem;color:var(--muted);margin-top:.25rem}
+.store-badges{display:flex;gap:1rem;justify-content:center;align-items:center;margin-top:1rem;flex-wrap:wrap}
+.store-badges img{height:3rem}
 
 /* ── Footer ── */
 footer{background:var(--foot-bg);border-top:1px solid var(--border);padding:3rem 1rem;padding-bottom:calc(3rem + env(safe-area-inset-bottom,0px))}

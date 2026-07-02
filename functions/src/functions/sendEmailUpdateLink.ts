@@ -8,13 +8,14 @@ import { checkRateLimit, checkRateLimitDaily } from '../utils/rateLimit';
 if (!admin.apps.length) admin.initializeApp();
 
 const APP_AUTH_BASE = 'https://vpk.to/auth-redirect';
+const ALLOWED_WEB_ORIGINS = ['https://vidopick.com', 'http://localhost:5173'];
 
 export const sendEmailUpdateLink = onCall(async (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Must be logged in');
   }
 
-  const { newEmail } = request.data as { newEmail?: string };
+  const { newEmail, webOrigin } = request.data as { newEmail?: string; webOrigin?: string };
   if (!newEmail || typeof newEmail !== 'string') {
     throw new HttpsError('invalid-argument', 'newEmail is required');
   }
@@ -56,11 +57,20 @@ export const sendEmailUpdateLink = onCall(async (request) => {
     { merge: true }
   );
 
-  const firebaseLink = await admin.auth().generateVerifyAndChangeEmailLink(currentEmail, trimmed, {
-    url: APP_AUTH_BASE,
-    handleCodeInApp: true,
-  });
-  const verifyLink = `${APP_AUTH_BASE}?link=${encodeURIComponent(firebaseLink)}`;
+  const isWebFlow = typeof webOrigin === 'string' && ALLOWED_WEB_ORIGINS.includes(webOrigin);
+  let verifyLink: string;
+  if (isWebFlow) {
+    const continueUrl = `${webOrigin}/vp/auth/email-action/?mode=email-change`;
+    verifyLink = await admin.auth().generateVerifyAndChangeEmailLink(currentEmail, trimmed, {
+      url: continueUrl,
+    });
+  } else {
+    const firebaseLink = await admin.auth().generateVerifyAndChangeEmailLink(currentEmail, trimmed, {
+      url: APP_AUTH_BASE,
+      handleCodeInApp: true,
+    });
+    verifyLink = `${APP_AUTH_BASE}?link=${encodeURIComponent(firebaseLink)}`;
+  }
 
   const resend = new Resend(resendApiKey);
   await resend.emails.send({

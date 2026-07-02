@@ -39,6 +39,18 @@ async function resolveAffiliate(
   throw new HttpsError('permission-denied', 'Not a registered affiliate');
 }
 
+async function fetchPlaylistThumbnails(
+  db: admin.firestore.Firestore,
+  playlistIds: string[]
+): Promise<string[]> {
+  const ids = playlistIds.slice(0, 3).filter(Boolean);
+  if (ids.length === 0) return [];
+  const snaps = await Promise.all(ids.map((id) => db.doc(`scannedPlaylists/${id}`).get()));
+  return snaps
+    .map((s) => s.data()?.thumbnail as string | undefined)
+    .filter((t): t is string => !!t);
+}
+
 export const addPublicProfile = onCall(
   { region: 'us-central1', memory: '256MiB' },
   async (request) => {
@@ -145,12 +157,15 @@ export const addPublicProfile = onCall(
       );
     }
 
+    const thumbnails = await fetchPlaylistThumbnails(db, profileData.playlistIds ?? []);
+
     await db.doc(`affiliates/${affiliateId}/publicProfiles/${profileId}`).set({
       profileId,
       shortlinkId,
       description: description.trim(),
       profileName: profileData.name ?? 'Profile',
       profileColor: profileData.color ?? '#3b82f6',
+      thumbnails,
       addedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 

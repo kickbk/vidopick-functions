@@ -35,28 +35,44 @@ export const revertEmailChange = onRequest(
     };
 
     if (!token) {
-      return respond(false, 'Invalid link', 'This revert link is missing a token. Please use the link from your email exactly as received.');
+      return respond(
+        false,
+        'Invalid link',
+        'This revert link is missing a token. Please use the link from your email exactly as received.'
+      );
     }
 
     const db = admin.firestore();
     const tokenDoc = await db.collection('emailRevertTokens').doc(token).get();
 
     if (!tokenDoc.exists) {
-      return respond(false, 'Link already used', 'This revert link has already been used or does not exist. If you still need help, contact us at vidopickhelp@gmail.com.');
+      return respond(
+        false,
+        'Link already used',
+        'This revert link has already been used or does not exist. If you still need help, contact us at support@vidopick.com.'
+      );
     }
 
     const { uid, originalEmail, newEmail, expiresAt } = tokenDoc.data()!;
 
     if (expiresAt.toMillis() < Date.now()) {
       await tokenDoc.ref.delete();
-      return respond(false, 'Link expired', `This revert link expired after ${7} days. Please contact us at vidopickhelp@gmail.com if you need help recovering your account.`);
+      return respond(
+        false,
+        'Link expired',
+        `This revert link expired after ${7} days. Please contact us at support@vidopick.com if you need help recovering your account.`
+      );
     }
 
     try {
       await admin.auth().updateUser(uid, { email: originalEmail });
       // Delete ALL revert tokens for this UID — voids any token from a chained attack.
       const allTokens = await db.collection('emailRevertTokens').where('uid', '==', uid).get();
-      const affiliateSnap = await db.collection('affiliates').where('authUid', '==', uid).limit(1).get();
+      const affiliateSnap = await db
+        .collection('affiliates')
+        .where('authUid', '==', uid)
+        .limit(1)
+        .get();
       const batch = db.batch();
       allTokens.docs.forEach((doc) => batch.delete(doc.ref));
       if (!affiliateSnap.empty) {
@@ -67,7 +83,10 @@ export const revertEmailChange = onRequest(
         // Revoke all sessions — kicks out whoever is currently using this account.
         admin.auth().revokeRefreshTokens(uid),
         // Clear any pending change so it can't be re-applied with a lingering token.
-        db.doc(`users/${uid}`).update({ pendingEmailChange: admin.firestore.FieldValue.delete() }).catch(() => {}),
+        db
+          .doc(`users/${uid}`)
+          .update({ pendingEmailChange: admin.firestore.FieldValue.delete() })
+          .catch(() => {}),
       ]);
       return respond(
         true,
@@ -76,7 +95,11 @@ export const revertEmailChange = onRequest(
       );
     } catch (e: any) {
       console.error('[revertEmailChange] updateUser failed:', e);
-      return respond(false, 'Something went wrong', 'We couldn\'t revert your email change. Please contact us at vidopickhelp@gmail.com and we\'ll sort it out right away.');
+      return respond(
+        false,
+        'Something went wrong',
+        "We couldn't revert your email change. Please contact us at support@vidopick.com and we'll sort it out right away."
+      );
     }
   }
 );

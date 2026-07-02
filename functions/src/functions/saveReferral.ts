@@ -57,6 +57,10 @@ export const saveReferral = onCall(
         { signups: admin.firestore.FieldValue.increment(1) },
         { merge: true }
       ),
+      db.doc(`affiliates/${affiliateId}`).set(
+        { stats: { signups: admin.firestore.FieldValue.increment(1) } },
+        { merge: true }
+      ),
     ]);
 
     console.log(`[saveReferral] uid=${uid} referredByAffiliateId=${affiliateId} shortlinkId=${shortlinkId}`);

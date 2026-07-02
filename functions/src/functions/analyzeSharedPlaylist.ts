@@ -152,7 +152,7 @@ async function fetchPlaylistXml(playlistId: string): Promise<any> {
     const xml = response.data;
     const mainTitleMatch = xml.match(/<title>(.*?)<\/title>/);
     const playlistTitle = mainTitleMatch
-      ? decodeHtmlEntities(mainTitleMatch[1])
+      ? decodeHtmlEntities(mainTitleMatch[1]).replace(/^Uploads from /i, '')
       : 'Unknown Playlist';
     const nameMatch = xml.match(/<name>(.*?)<\/name>/);
     const author = nameMatch ? decodeHtmlEntities(nameMatch[1]) : 'YouTube Channel';
@@ -197,7 +197,7 @@ async function sendModerationEmail(playlistData: any) {
   try {
     await resend.emails.send({
       from: 'Vidopick <hello@vidopick.com>',
-      to: 'hello@vidopick.com',
+      to: 'info@vidopick.com',
       subject: `📝 New Playlist Submitted: "${playlistData.title}"`,
       html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
@@ -244,8 +244,52 @@ export const analyzeSharedPlaylist = onRequest(
       return;
     }
 
-    const { playlistId } = request.body;
-    if (!playlistId || typeof playlistId !== 'string' || !/^[A-Za-z0-9_-]{10,60}$/.test(playlistId)) {
+    let { playlistId, channelHandle } = request.body;
+
+    // Resolve a channel @handle to its UU uploads-playlist ID via YouTube API
+    if (!playlistId && channelHandle) {
+      if (typeof channelHandle !== 'string' || !/^[\w.-]{1,100}$/.test(channelHandle)) {
+        response.status(400).json({ error: 'Invalid channelHandle' });
+        return;
+      }
+      try {
+        // Free path: RSS user= param works when @handle matches the legacy YouTube username
+        let channelId: string | undefined;
+        try {
+          const rssRes = await axios.get(
+            `https://www.youtube.com/feeds/videos.xml?user=${encodeURIComponent(channelHandle)}`,
+            { timeout: 8000 }
+          );
+          const match = (rssRes.data as string).match(/\/channel\/(UC[\w-]+)/);
+          channelId = match?.[1];
+        } catch {
+          // 404 or network error — fall through to API
+        }
+
+        // Paid fallback: channels.list?forHandle= (5 quota units)
+        if (!channelId) {
+          const channelRes = await axios.get(
+            `https://www.googleapis.com/youtube/v3/channels?part=id&forHandle=${encodeURIComponent(channelHandle)}&key=${YOUTUBE_API_KEY}`
+          );
+          channelId = channelRes.data.items?.[0]?.id;
+        }
+
+        if (!channelId) {
+          response.status(400).json({ error: 'Channel not found.' });
+          return;
+        }
+        playlistId = channelId.replace('UC', 'UU');
+      } catch {
+        response.status(502).json({ error: 'Failed to resolve channel.' });
+        return;
+      }
+    }
+
+    if (
+      !playlistId ||
+      typeof playlistId !== 'string' ||
+      !/^[A-Za-z0-9_-]{10,60}$/.test(playlistId)
+    ) {
       response.status(400).json({ error: 'Missing or invalid playlistId' });
       return;
     }

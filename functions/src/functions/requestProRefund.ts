@@ -5,7 +5,7 @@ import { defineSecret } from 'firebase-functions/params';
 import { notifyUser } from '../utils/notifyUser';
 import { buildOwnerRefundEmail } from '../utils/emailTemplates';
 
-const OWNER_EMAIL = 'vidopick@gmail.com';
+const OWNER_EMAIL = 'support@vidopick.com';
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -29,7 +29,10 @@ export const requestProRefund = onCall(
 
     // One refund per account, ever — prevent abuse.
     if (userData.refundedAt) {
-      throw new HttpsError('failed-precondition', 'A refund has already been issued for this account.');
+      throw new HttpsError(
+        'failed-precondition',
+        'A refund has already been issued for this account.'
+      );
     }
 
     // Must have cancelled (proCancelOn set) but still have a subscription
@@ -57,10 +60,9 @@ export const requestProRefund = onCall(
     }
 
     const isTestMode = userData.testMode === true;
-    const stripe = new Stripe(
-      isTestMode ? stripeSecretKeyTest.value() : stripeSecretKey.value(),
-      { apiVersion: '2026-03-25.dahlia' }
-    );
+    const stripe = new Stripe(isTestMode ? stripeSecretKeyTest.value() : stripeSecretKey.value(), {
+      apiVersion: '2026-03-25.dahlia',
+    });
 
     // Issue refund on the latest invoice
     let refundIssued = false;
@@ -95,23 +97,31 @@ export const requestProRefund = onCall(
           'Refund was issued but the subscription could not be cancelled. Please contact support to confirm cancellation.'
         );
       }
-      console.log('[requestProRefund] subscription already cancelled — proceeding with Firestore cleanup');
+      console.log(
+        '[requestProRefund] subscription already cancelled — proceeding with Firestore cleanup'
+      );
     }
 
     // Update user + subscription records
     await Promise.all([
-      db.doc(`users/${uid}`).set({
-        proStatus: 'none',
-        proType: null,
-        stripeSubscriptionId: null,
-        stripeCancelledAt: admin.firestore.FieldValue.serverTimestamp(),
-        proCancelOn: null,
-        refundedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true }),
-      db.doc(`subscriptions/${subscriptionId}`).set({
-        status: 'refunded',
-        refundedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }, { merge: true }),
+      db.doc(`users/${uid}`).set(
+        {
+          proStatus: 'none',
+          proType: null,
+          stripeSubscriptionId: null,
+          stripeCancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+          proCancelOn: null,
+          refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      ),
+      db.doc(`subscriptions/${subscriptionId}`).set(
+        {
+          status: 'refunded',
+          refundedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      ),
     ]);
 
     // Remove affiliate commission and decrement counters
@@ -129,21 +139,26 @@ export const requestProRefund = onCall(
       if (deletes.length > 0) {
         await Promise.all([
           ...deletes,
-          db.doc(`affiliates/${affiliateId}`).set({
-            stats: {
-              pendingEarningsCents: admin.firestore.FieldValue.increment(-totalPendingCents),
-              payingCustomers: admin.firestore.FieldValue.increment(-1),
-              activeSubscribers: admin.firestore.FieldValue.increment(-1),
+          db.doc(`affiliates/${affiliateId}`).set(
+            {
+              stats: {
+                pendingEarningsCents: admin.firestore.FieldValue.increment(-totalPendingCents),
+                payingCustomers: admin.firestore.FieldValue.increment(-1),
+                activeSubscribers: admin.firestore.FieldValue.increment(-1),
+              },
             },
-          }, { merge: true }),
+            { merge: true }
+          ),
         ]);
       }
       const shortlinkId: string | undefined = userData.referredByShortlinkId;
       if (shortlinkId) {
-        await db.doc(`shortLinks/${shortlinkId}`).set(
-          { analytics: { payingConversions: admin.firestore.FieldValue.increment(-1) } },
-          { merge: true }
-        );
+        await db
+          .doc(`shortLinks/${shortlinkId}`)
+          .set(
+            { analytics: { payingConversions: admin.firestore.FieldValue.increment(-1) } },
+            { merge: true }
+          );
       }
     }
 
@@ -151,7 +166,9 @@ export const requestProRefund = onCall(
     const deviceTokens: string[] = userData.deviceTokens ?? [];
     if (deviceTokens.length > 0) {
       await notifyUser(
-        db, uid, deviceTokens,
+        db,
+        uid,
+        deviceTokens,
         'Refund Processed',
         'Your full refund is on the way. Your Pro access has been removed. You can restart a Pro subscription anytime.',
         { type: 'subscription_refunded' }
@@ -200,7 +217,9 @@ export const requestProRefund = onCall(
       console.warn('[requestProRefund] owner email failed:', emailErr);
     }
 
-    console.log(`[requestProRefund] uid=${uid} subscriptionId=${subscriptionId} refundIssued=${refundIssued} testMode=${isTestMode}`);
+    console.log(
+      `[requestProRefund] uid=${uid} subscriptionId=${subscriptionId} refundIssued=${refundIssued} testMode=${isTestMode}`
+    );
     return { success: true, refundIssued };
   }
 );

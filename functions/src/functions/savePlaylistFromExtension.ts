@@ -77,9 +77,11 @@ export const savePlaylistFromExtension = onRequest(
       const existingSnap = await db.collection('scannedPlaylists').doc(playlistId).get();
       const existingData = existingSnap.exists ? existingSnap.data() : null;
 
+      const type = playlistId.startsWith('UU') ? 'channel' : 'playlist';
+
       const dataToSave = existingData
-        ? { ...existingData, ...cleanedData, isApproved: true }
-        : { ...cleanedData, importCount: 0, isApproved: true };
+        ? { ...existingData, ...cleanedData, isApproved: true, type }
+        : { ...cleanedData, importCount: 0, isApproved: true, type };
 
       await db.collection('scannedPlaylists').doc(playlistId).set(dataToSave, { merge: true });
 

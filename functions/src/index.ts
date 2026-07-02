@@ -101,6 +101,7 @@ export { claimVidopickerSlug } from './functions/claimVidopickerSlug';
 export { addPublicProfile } from './functions/addPublicProfile';
 export { removePublicProfile } from './functions/removePublicProfile';
 export { onProfileSharingDisabled } from './functions/onProfileSharingDisabled';
+export { onAffiliateProfilePlaylistsChanged } from './functions/onAffiliateProfilePlaylistsChanged';
 export { onVpAffiliateWrite, onVpPublicProfileWrite, onVidopickProfileDeleted } from './functions/generateVpProfile';
 export { serveVpProfile } from './functions/serveVpProfile';
 export { serveSitemap } from './functions/serveSitemap';
@@ -110,3 +111,4 @@ export { sendAffiliateOutreachEmail } from './functions/sendAffiliateOutreachEma
 export { resendOutreachWebhook } from './functions/resendOutreachWebhook';
 export { importLeadsFromUpload } from './functions/importLeadsFromUpload';
 export { activateAffiliateJoin } from './functions/activateAffiliateJoin';
+export { adminUpdateAffiliateEmail } from './functions/adminUpdateAffiliateEmail';

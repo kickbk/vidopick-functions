@@ -1,5 +1,4 @@
 import { Storage } from '@google-cloud/storage';
-import { getFirestore } from 'firebase-admin/firestore';
 import { onObjectFinalized } from 'firebase-functions/v2/storage';
 import * as fs from 'fs';
 import * as os from 'os';
@@ -24,6 +23,11 @@ export const compressUploadedImage = onObjectFinalized(
 
     if (filePath.endsWith('_compressed.webp') || filePath.endsWith('_compressed.jpg')) {
       return console.log('Skipping: Already compressed.');
+    }
+
+    // Affiliate photos are overwritten in place; the optimized flag prevents re-triggering.
+    if (event.data.metadata?.optimized === 'true') {
+      return console.log('Skipping: Already optimized.');
     }
 
     // --- 2. Determine Settings ---
@@ -52,11 +56,10 @@ export const compressUploadedImage = onObjectFinalized(
       targetHeight = 630;
       format = 'jpeg';
     } else if (filePath.startsWith('affiliates/') && filePath.endsWith('/photo.jpg')) {
-      // Affiliate profile photos render as small avatars on /vp pages
       folderType = 'AFFILIATE_PHOTO';
       targetWidth = 512;
       targetHeight = 512;
-      format = 'webp';
+      format = 'jpeg';
       fit = 'inside';
     } else {
       return console.log('Skipping: Path not monitored', filePath);
@@ -69,11 +72,12 @@ export const compressUploadedImage = onObjectFinalized(
     const newExt = format === 'webp' ? 'webp' : 'jpg';
 
     const tempFilePath = path.join(os.tmpdir(), fileName);
+    // Affiliate photos overwrite in place; others get a _compressed.* sibling file.
+    const isInPlace = folderType === 'AFFILIATE_PHOTO';
     const tempCompressedPath = path.join(os.tmpdir(), `${fileNameNoExt}_compressed.${newExt}`);
-
-    const destinationDir = path.dirname(filePath);
-    const compressedFileName = `${fileNameNoExt}_compressed.${newExt}`;
-    const compressedFilePath = path.join(destinationDir, compressedFileName);
+    const destinationFilePath = isInPlace
+      ? filePath
+      : path.join(path.dirname(filePath), `${fileNameNoExt}_compressed.${newExt}`);
 
     try {
       // --- 4. Download ---
@@ -120,39 +124,26 @@ export const compressUploadedImage = onObjectFinalized(
 
       // --- 6. Upload Processed File ---
       await bucket.upload(tempCompressedPath, {
-        destination: compressedFilePath,
+        destination: destinationFilePath,
         predefinedAcl: 'publicRead',
         metadata: {
           contentType: format === 'webp' ? 'image/webp' : 'image/jpeg',
           metadata: {
-            originalFile: filePath,
             optimized: 'true',
             orientation: isPortrait ? 'portrait' : 'landscape',
           },
         },
       });
 
-      // --- 6b. For affiliate photos, update the Firestore document so the stored
-      // URL points to the compressed file rather than the original (which gets
-      // deleted below). Path shape: affiliates/{uid}/photo.jpg; uid == authUid.
-      if (folderType === 'AFFILIATE_PHOTO') {
-        const publicUrl = `https://storage.googleapis.com/${bucketName}/${compressedFilePath}`;
-        const uid = filePath.split('/')[1];
-        if (uid) {
-          const db = getFirestore();
-          const snap = await db.collection('affiliates').where('authUid', '==', uid).limit(1).get();
-          if (!snap.empty) {
-            await snap.docs[0].ref.update({ photo: publicUrl });
-          }
-        }
-      }
-
       // --- 7. Cleanup ---
-      await bucket.file(filePath).delete();
+      // Affiliate photos are overwritten in place — no separate original to delete.
+      if (!isInPlace) {
+        await bucket.file(filePath).delete();
+      }
       fs.unlinkSync(tempFilePath);
       fs.unlinkSync(tempCompressedPath);
 
-      console.log(`✅ Complete: ${compressedFilePath} (${finalWidth}x${finalHeight})`);
+      console.log(`✅ Complete: ${destinationFilePath} (${finalWidth}x${finalHeight})`);
     } catch (error) {
       console.error('Error processing image:', error);
       if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);

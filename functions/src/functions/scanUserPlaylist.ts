@@ -200,12 +200,12 @@ async function sendModerationEmail(playlistData: {
   await resend.emails
     .send({
       from: 'Vidopick <hello@vidopick.com>',
-      to: 'hello@vidopick.com',
-      subject: `📱 User-Added Playlist: "${playlistData.title}"`,
+      to: 'notifications@vidopick.com',
+      subject: `📱 User-Added Content: "${playlistData.title}"`,
       html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #ddd;border-radius:8px;padding:20px;">
-        <h2 style="color:#2c3e50;margin-top:0;">User-Added Playlist (pending review)</h2>
-        <p>A user imported a playlist not yet in the approved library. It is saved in <strong>scannedPlaylists</strong> with <code>isApproved: false</code>.</p>
+        <h2 style="color:#2c3e50;margin-top:0;">User-Added Content (pending review)</h2>
+        <p>A user imported a playlist or channel not yet in the approved library. It is saved in <strong>scannedPlaylists</strong> with <code>isApproved: false</code>.</p>
         <div style="background:#f8f9fa;padding:15px;border-radius:6px;margin:20px 0;">
           <h3 style="margin:0 0 10px 0;">${playlistData.title}</h3>
           <p style="margin:5px 0;"><strong>Author:</strong> ${playlistData.author}</p>
@@ -274,12 +274,10 @@ export const scanUserPlaylist = onRequest(
           .collection('scannedPlaylists')
           .doc(playlistId)
           .update({ submittedBy: admin.firestore.FieldValue.arrayUnion(uid) });
-        res
-          .status(200)
-          .json({
-            source: existingSnap.data()?.isApproved ? 'approved' : 'scanned',
-            ...existingSnap.data(),
-          });
+        res.status(200).json({
+          source: existingSnap.data()?.isApproved ? 'approved' : 'scanned',
+          ...existingSnap.data(),
+        });
         return;
       }
 
@@ -379,6 +377,7 @@ IMPORTANT for languages: always return an array. Rules: (1) Explicit labels like
         },
         videoCount: data.totalCount,
         isAppropriate: aiResult.isAppropriate ?? true,
+        type: playlistId.startsWith('UU') ? 'channel' : 'playlist',
         isApproved: false,
         status: (aiResult.isAppropriate ?? true) ? 'scanned' : 'flagged',
         reviewedBy: 'pending',
@@ -401,12 +400,13 @@ IMPORTANT for languages: always return an array. Rules: (1) Explicit labels like
       res.status(200).json({ source: 'new', ...result });
     } catch (error: any) {
       console.error('[scanUserPlaylist] error:', error);
+      const itemLabel = playlistId.startsWith('UU') ? 'Channel' : 'Playlist';
       if (error.message === 'PLAYLIST_NOT_FOUND') {
         res
           .status(404)
-          .json({ error: 'Playlist not found on YouTube. It may be private or deleted.' });
+          .json({ error: `${itemLabel} not found on YouTube. It may be private or deleted.` });
       } else {
-        res.status(500).json({ error: 'Failed to scan playlist', details: error.message });
+        res.status(500).json({ error: `Failed to scan ${itemLabel.toLowerCase()}`, details: error.message });
       }
     }
   }

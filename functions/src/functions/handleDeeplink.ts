@@ -193,12 +193,18 @@ async function rollupClick(id: string, platform: 'ios' | 'android' | 'desktop', 
   // Separately update affiliate dailyStats so a failure here doesn't affect the link counter
   if (affiliateId) {
     try {
-      await db.collection('affiliates').doc(affiliateId).collection('dailyStats').doc(date).set(
-        { clicks: admin.firestore.FieldValue.increment(1) },
-        { merge: true }
-      );
+      await Promise.all([
+        db.collection('affiliates').doc(affiliateId).collection('dailyStats').doc(date).set(
+          { clicks: admin.firestore.FieldValue.increment(1) },
+          { merge: true }
+        ),
+        db.doc(`affiliates/${affiliateId}`).set(
+          { stats: { clicks: admin.firestore.FieldValue.increment(1) } },
+          { merge: true }
+        ),
+      ]);
     } catch (e) {
-      console.error(`[rollupClick] dailyStats write failed affiliateId=${affiliateId} date=${date}:`, e);
+      console.error(`[rollupClick] affiliate write failed affiliateId=${affiliateId} date=${date}:`, e);
     }
   }
 }
@@ -323,9 +329,8 @@ app.get('/device-auth', (req, res) => {
   return res.redirect(302, `${VIDOPICK_ORIGIN}/device-auth/${qs ? `?${qs}` : ''}`);
 });
 
-// --- Route ---
-app.get('/:id', async (req, res) => {
-  const { id } = req.params;
+// --- Core handler (shared by /:id and /a/:slug) ---
+async function handleShortlinkById(id: string, req: express.Request, res: express.Response) {
   const ua = String(req.headers['user-agent'] || '');
 
   try {
@@ -363,6 +368,9 @@ app.get('/:id', async (req, res) => {
       | undefined;
     const isProfileInvite = !!profileData;
 
+    // ?ref= carries the affiliate profile-share attribution — propagate it through all redirects
+    const refId = typeof (req.query as any).ref === 'string' ? (req.query as any).ref : undefined;
+
     const paramsObj: Record<string, string> = {
       ogTitle,
       ogDescription,
@@ -378,6 +386,8 @@ app.get('/:id', async (req, res) => {
         isProfileInvite: '1',
         profileNames: profileData?.displayName || profileData?.name || 'Profile',
       }),
+      // Pass ?ref= through so the landing page and desktop redirects preserve attribution
+      ...(refId && { ref: refId }),
     };
     const rawParams = (data as any)?.params || {};
     for (const [k, v] of Object.entries(rawParams)) {
@@ -458,12 +468,19 @@ app.get('/:id', async (req, res) => {
       return res.status(200).send(html);
     }
 
+    // Continue → device-aware redirect + rollup
+    const affiliateId = (data as any).affiliateId as string | undefined;
+
+    // Profile share links skip the /get/ landing page entirely — they go straight to the
+    // affiliate's profile page (redirect.desktop already has ?ref= baked in at creation time).
+    if ((data as any).isProfileShareLink === true) {
+      void rollupClick(id, device, affiliateId);
+      return res.redirect(302, desktopUrl || `${VIDOPICK_ORIGIN}/`);
+    }
+
     // Human: first land on /get unless they've confirmed (?c=1)
     const wantsContinue = typeof (req.query as any).c !== 'undefined';
     if (!wantsContinue) return res.redirect(302, landing);
-
-    // Continue → device-aware redirect + rollup
-    const affiliateId = (data as any).affiliateId as string | undefined;
     let target: string;
     if (webOnly) {
       // roll up using actual device (not always desktop)
@@ -490,6 +507,16 @@ app.get('/:id', async (req, res) => {
     console.error('Redirect error:', err);
     return res.status(500).send('Internal server error');
   }
+}
+
+// Affiliate profile share links: vpk.to/a/{slug} → shortLinks/a_{slug}
+app.get('/a/:slug', async (req, res) => {
+  await handleShortlinkById(`a_${req.params.slug}`, req, res);
+});
+
+// Generic shortlink
+app.get('/:id', async (req, res) => {
+  await handleShortlinkById(req.params.id, req, res);
 });
 
 export const handleDeeplink = onRequest(

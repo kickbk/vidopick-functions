@@ -31,6 +31,7 @@ async function regenerateProfile(
     profileName: d.data().profileName ?? 'Profile',
     profileColor: d.data().profileColor ?? '#3b82f6',
     description: d.data().description ?? '',
+    thumbnails: d.data().thumbnails ?? [],
   }));
 
   const hasAllFields = !!(data.name && data.bio && data.photo);
@@ -108,8 +109,10 @@ async function regenerateProfile(
     socialLinks: data.socialLinks ?? [],
     slug: data.slug ?? null,
     isPublic,
+    isHidden: data.isHidden ?? false,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+
 
   // Store under the real affiliate ID
   await bucket.file(`profile-html/${affiliateId}.html`).save(buf, opts);
