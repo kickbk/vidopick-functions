@@ -65,7 +65,7 @@ export const addPublicProfile = onCall(
     if (!description?.trim()) throw new HttpsError('invalid-argument', 'description is required');
 
     const db = admin.firestore();
-    const { affiliateId, affiliateData } = await resolveAffiliate(
+    const { affiliateId } = await resolveAffiliate(
       db,
       request.auth.uid,
       request.auth.token.email,
@@ -79,6 +79,10 @@ export const addPublicProfile = onCall(
       throw new HttpsError('permission-denied', 'Profile does not belong to your account');
     }
 
+    // Name lives in public/profile (the single source of truth for display fields).
+    const pubProfileSnap = await db.doc(`affiliates/${affiliateId}/public/profile`).get();
+    const affiliateName: string = (pubProfileSnap.data()?.name as string | undefined) ?? '';
+
     const existingEntry = await db.doc(`affiliates/${affiliateId}/publicProfiles/${profileId}`).get();
     if (existingEntry.exists) {
       throw new HttpsError('already-exists', 'This profile is already featured publicly');
@@ -91,7 +95,7 @@ export const addPublicProfile = onCall(
       const slRef = db.collection('shortLinks').doc();
       shortlinkId = slRef.id;
       await slRef.set({
-        linkTitle: `${affiliateData.name} invites you to try Vidopick`,
+        linkTitle: `${affiliateName} invites you to try Vidopick`,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         createdBy: request.auth.uid,
         affiliateId,
@@ -104,11 +108,11 @@ export const addPublicProfile = onCall(
           webOnly: false,
         },
         params: {
-          name: affiliateData.name,
+          name: affiliateName,
           profile: {
             uid: profileData.uid,
             profileId,
-            displayName: profileData.name ?? affiliateData.name,
+            displayName: profileData.name ?? affiliateName,
             color: profileData.color ?? 'blue',
             playlistIds: profileData.playlistIds ?? [],
           },
@@ -126,7 +130,7 @@ export const addPublicProfile = onCall(
       const slRef = db.collection('shortLinks').doc();
       shortlinkId = slRef.id;
       await slRef.set({
-        linkTitle: `${affiliateData.name} invites you to try Vidopick`,
+        linkTitle: `${affiliateName} invites you to try Vidopick`,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         createdBy: request.auth.uid,
         affiliateId,
@@ -139,11 +143,11 @@ export const addPublicProfile = onCall(
           webOnly: false,
         },
         params: {
-          name: affiliateData.name,
+          name: affiliateName,
           profile: {
             uid: profileData.uid,
             profileId,
-            displayName: profileData.name ?? affiliateData.name,
+            displayName: profileData.name ?? affiliateName,
             color: profileData.color ?? 'blue',
             playlistIds: profileData.playlistIds ?? [],
           },

@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import Stripe from 'stripe';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
+import { getAffiliateDisplayFields } from '../utils/affiliateDisplay';
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -66,10 +67,8 @@ export const updateAffiliateShortlink = onCall(
     }
 
     // Fetch affiliate name to rebuild linkTitle
-    const affiliateSnap = await db.doc(`affiliates/${linkData.affiliateId}`).get();
-    const affiliateName: string = affiliateSnap.exists
-      ? (affiliateSnap.data()!.name ?? '')
-      : '';
+    const affiliateName: string =
+      (await getAffiliateDisplayFields(db, linkData.affiliateId)).name ?? '';
 
     // Build new params (fully replaces old params)
     const params: Record<string, any> = {};

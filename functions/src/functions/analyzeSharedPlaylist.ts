@@ -196,8 +196,8 @@ async function sendModerationEmail(playlistData: any) {
   const resend = new Resend(RESEND_API_KEY);
   try {
     await resend.emails.send({
-      from: 'Vidopick <hello@vidopick.com>',
-      to: 'info@vidopick.com',
+      from: 'Vidopick <noreply@vidopick.com>',
+      to: 'notifications@vidopick.com',
       subject: `📝 New Playlist Submitted: "${playlistData.title}"`,
       html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">

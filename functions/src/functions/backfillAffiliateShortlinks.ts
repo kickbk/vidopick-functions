@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import Stripe from 'stripe';
+import { getAffiliateDisplayFields } from '../utils/affiliateDisplay';
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -38,6 +39,8 @@ export const backfillAffiliateShortlinks = onCall(
     if (!authUid) throw new HttpsError('failed-precondition', 'Affiliate has no authUid — user must sign in first');
 
     const discountPercent: number = affiliateData.discountPercent ?? 0;
+    const affiliateName =
+      (await getAffiliateDisplayFields(db, affiliateId)).name ?? null;
     const sandboxMode = sandboxRequested === true;
     const stripe = new Stripe(
       sandboxMode ? stripeSecretKeyTest.value() : stripeSecretKey.value(),
@@ -73,7 +76,7 @@ export const backfillAffiliateShortlinks = onCall(
             const coupon = await stripe.coupons.create({
               percent_off: discountPercent,
               duration: 'forever',
-              name: data.label ?? affiliateData.name ?? affiliateId,
+              name: data.label ?? affiliateName ?? affiliateId,
               metadata: { affiliateId, shortlinkId: doc.id },
             });
             stripeCouponId = coupon.id;

@@ -71,7 +71,9 @@ export const sendMemberAppInvite = onCall(async (request) => {
     await db
       .doc(`shortLinks/${prevLinkId}`)
       .update({ disabled: true })
-      .catch((e) => console.warn(`[sendMemberAppInvite] disabling previous link ${prevLinkId} failed:`, e));
+      .catch((e) =>
+        console.warn(`[sendMemberAppInvite] disabling previous link ${prevLinkId} failed:`, e)
+      );
   }
 
   // Create the new invite short link
@@ -113,7 +115,7 @@ export const sendMemberAppInvite = onCall(async (request) => {
 
   const resend = new Resend(RESEND_API_KEY);
   await resend.emails.send({
-    from: 'Vidopick <hello@vidopick.com>',
+    from: 'Vidopick <noreply@vidopick.com>',
     to: email,
     subject: `${orgName} invites you to Vidopick`,
     html: buildMemberAppInviteEmail(

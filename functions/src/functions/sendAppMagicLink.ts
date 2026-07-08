@@ -80,7 +80,7 @@ export const sendAppMagicLink = onRequest(
 
       const resend = new Resend(RESEND_API_KEY);
       await resend.emails.send({
-        from: 'Vidopick <hello@vidopick.com>',
+        from: 'Vidopick <noreply@vidopick.com>',
         to: email,
         subject: 'Your Vidopick sign-in link',
         html: buildAppMagicLinkEmail(appLink),

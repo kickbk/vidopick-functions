@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { Resend } from 'resend';
 import { buildAffiliateInviteEmail } from '../utils/emailTemplates';
+import { getAffiliateDisplayFields } from '../utils/affiliateDisplay';
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -32,7 +33,7 @@ export const sendAffiliateInvite = onCall({ region: 'us-central1' }, async (requ
 
   const affiliate = snap.data()!;
   const email: string = affiliate.email;
-  const name: string = affiliate.name ?? 'there';
+  const name: string = (await getAffiliateDisplayFields(db, affiliateId)).name ?? 'there';
 
   if (!email) throw new HttpsError('failed-precondition', 'Affiliate has no email address.');
 
@@ -82,7 +83,7 @@ export const sendAffiliateInvite = onCall({ region: 'us-central1' }, async (requ
 
   const resend = new Resend(RESEND_API_KEY);
   await resend.emails.send({
-    from: 'Vidopick <hello@vidopick.com>',
+    from: 'Vidopick <noreply@vidopick.com>',
     to: email,
     subject: "You're invited to Vidopick affiliates",
     html: buildAffiliateInviteEmail(name, email, magicLink),
@@ -96,4 +97,3 @@ export const sendAffiliateInvite = onCall({ region: 'us-central1' }, async (requ
   console.log(`[sendAffiliateInvite] invite sent to ${email} (affiliateId=${affiliateId})`);
   return { sent: true };
 });
-

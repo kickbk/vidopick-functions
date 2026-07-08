@@ -37,7 +37,10 @@ export const completeEmailChange = onCall(async (request) => {
   const pending = userDoc.data()?.pendingEmailChange;
 
   if (!pending) {
-    throw new HttpsError('not-found', 'No pending email change found. The link may have already been used.');
+    throw new HttpsError(
+      'not-found',
+      'No pending email change found. The link may have already been used.'
+    );
   }
 
   // Support both new object format { newEmail, oldEmail } and legacy string format.
@@ -83,12 +86,15 @@ export const completeEmailChange = onCall(async (request) => {
   const revertToken = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + REVERT_TTL_DAYS);
-  await db.collection('emailRevertTokens').doc(revertToken).set({
-    uid,
-    originalEmail: oldEmail ?? null,
-    newEmail,
-    expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
-  });
+  await db
+    .collection('emailRevertTokens')
+    .doc(revertToken)
+    .set({
+      uid,
+      originalEmail: oldEmail ?? null,
+      newEmail,
+      expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+    });
 
   // Send security notifications — best-effort, don't fail the change if this errors.
   const resendApiKey = process.env.RESEND_API_KEY;
@@ -103,7 +109,7 @@ export const completeEmailChange = onCall(async (request) => {
         // Notify old address so the account owner can revert if this was unauthorised.
         sends.push(
           resend.emails.send({
-            from: 'Vidopick <hello@vidopick.com>',
+            from: 'Vidopick <noreply@vidopick.com>',
             to: oldEmail,
             subject: 'Your Vidopick email address was changed',
             html: buildEmailChangeNotificationEmail(oldEmail, newEmail, revertLink),
@@ -114,10 +120,14 @@ export const completeEmailChange = onCall(async (request) => {
       // Confirm to the new address that the change completed successfully.
       sends.push(
         resend.emails.send({
-          from: 'Vidopick <hello@vidopick.com>',
+          from: 'Vidopick <noreply@vidopick.com>',
           to: newEmail,
           subject: 'Your Vidopick email address has been updated',
-          html: buildEmailChangeNotificationEmail(oldEmail ?? '(previous address)', newEmail, revertLink),
+          html: buildEmailChangeNotificationEmail(
+            oldEmail ?? '(previous address)',
+            newEmail,
+            revertLink
+          ),
         })
       );
 
@@ -127,6 +137,8 @@ export const completeEmailChange = onCall(async (request) => {
     }
   }
 
-  console.log(`[completeEmailChange] email confirmed ${oldEmail ?? '?'} → ${newEmail} for uid=${uid}`);
+  console.log(
+    `[completeEmailChange] email confirmed ${oldEmail ?? '?'} → ${newEmail} for uid=${uid}`
+  );
   return { customToken, newEmail };
 });

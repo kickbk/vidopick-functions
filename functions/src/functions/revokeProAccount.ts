@@ -112,7 +112,7 @@ export const revokeProAccount = onCall(
             ? `A change to your Vidopick Pro membership`
             : `Your Vidopick Pro membership from ${revokedOrgName} has ended`;
           await resend.emails.send({
-            from: 'Vidopick <hello@vidopick.com>',
+            from: 'Vidopick <noreply@vidopick.com>',
             to: userEmail,
             subject,
             html: buildProRevokedEmail(displayName, revokedOrgName, remainingOrgNames),

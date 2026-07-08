@@ -41,7 +41,10 @@ export const sendEmailUpdateLink = onCall(async (request) => {
     checkRateLimitDaily(`emailupdate_uid_${uid}`, 1),
   ]);
   if (!hourAllowed || !dayAllowed) {
-    throw new HttpsError('resource-exhausted', 'You can only change your email address once per day.');
+    throw new HttpsError(
+      'resource-exhausted',
+      'You can only change your email address once per day.'
+    );
   }
 
   const resendApiKey = process.env.RESEND_API_KEY;
@@ -52,10 +55,10 @@ export const sendEmailUpdateLink = onCall(async (request) => {
 
   // Store both emails so completeEmailChange can send the security notification to the
   // old address (the token will already show the new email by the time the CF runs).
-  await admin.firestore().doc(`users/${uid}`).set(
-    { pendingEmailChange: { newEmail: trimmed, oldEmail: currentEmail } },
-    { merge: true }
-  );
+  await admin
+    .firestore()
+    .doc(`users/${uid}`)
+    .set({ pendingEmailChange: { newEmail: trimmed, oldEmail: currentEmail } }, { merge: true });
 
   const isWebFlow = typeof webOrigin === 'string' && ALLOWED_WEB_ORIGINS.includes(webOrigin);
   let verifyLink: string;
@@ -65,16 +68,18 @@ export const sendEmailUpdateLink = onCall(async (request) => {
       url: continueUrl,
     });
   } else {
-    const firebaseLink = await admin.auth().generateVerifyAndChangeEmailLink(currentEmail, trimmed, {
-      url: APP_AUTH_BASE,
-      handleCodeInApp: true,
-    });
+    const firebaseLink = await admin
+      .auth()
+      .generateVerifyAndChangeEmailLink(currentEmail, trimmed, {
+        url: APP_AUTH_BASE,
+        handleCodeInApp: true,
+      });
     verifyLink = `${APP_AUTH_BASE}?link=${encodeURIComponent(firebaseLink)}`;
   }
 
   const resend = new Resend(resendApiKey);
   await resend.emails.send({
-    from: 'Vidopick <hello@vidopick.com>',
+    from: 'Vidopick <noreply@vidopick.com>',
     to: trimmed,
     subject: 'Confirm your new Vidopick email address',
     html: buildEmailUpdateEmail(currentEmail, trimmed, verifyLink),

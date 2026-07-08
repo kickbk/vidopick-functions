@@ -3,6 +3,7 @@ import { HttpsError, onCall } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { nanoid } from 'nanoid';
 import Stripe from 'stripe';
+import { getAffiliateDisplayFields } from '../utils/affiliateDisplay';
 
 const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
 const stripeSecretKeyTest = defineSecret('STRIPE_SECRET_KEY_TEST');
@@ -119,7 +120,8 @@ export const createInvite = onCall(
     if (!affiliateSnap.empty) {
       affiliateId = affiliateSnap.docs[0].id;
       const affiliateData = affiliateSnap.docs[0].data();
-      resolvedName = affiliateData.name ?? name;
+      resolvedName =
+        (await getAffiliateDisplayFields(db, affiliateId)).name ?? name;
       affiliateDiscountPercent = affiliateData.discountPercent ?? 0;
     } else {
       const userDoc = await db.doc(`users/${uid}`).get();

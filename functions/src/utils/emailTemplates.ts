@@ -416,10 +416,6 @@ export function buildAppMagicLinkEmail(signInLink: string): string {
               </tr>
             </table>
 
-            <p style="margin:0 0 20px;font-size:13px;color:#64748b;line-height:1.6;text-align:center;">
-              Check your junk folder if you don't see it.
-            </p>
-
             <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px;" />
 
             <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">

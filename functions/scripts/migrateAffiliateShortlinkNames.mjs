@@ -61,8 +61,9 @@ async function migrate() {
 
   const getAffiliateName = async (affiliateId) => {
     if (affiliateNameCache.has(affiliateId)) return affiliateNameCache.get(affiliateId);
-    const snap = await db.doc(`affiliates/${affiliateId}`).get();
-    const name = snap.exists ? (snap.data().name ?? null) : null;
+    // name lives in public/profile since the root-doc strip migration
+    const profileSnap = await db.doc(`affiliates/${affiliateId}/public/profile`).get();
+    const name = profileSnap.data()?.name ?? null;
     affiliateNameCache.set(affiliateId, name);
     return name;
   };

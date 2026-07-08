@@ -96,7 +96,7 @@ export const createOrganizationAccount = onCall(async (request) => {
     if (RESEND_API_KEY) {
       const resend = new Resend(RESEND_API_KEY);
       await resend.emails.send({
-        from: 'Vidopick <hello@vidopick.com>',
+        from: 'Vidopick <noreply@vidopick.com>',
         to: email,
         subject: "You're invited to Vidopick",
         html: buildInviteEmail(organizationName, signInLink),

@@ -25,6 +25,7 @@ interface LeadInput {
     instagram?: string | null;
     tiktok?: string | null;
     youtube?: string | null;
+    facebook?: string | null;
   };
   notes?: string;
   foundVia?: string;
@@ -83,6 +84,7 @@ export const importLeadsFromUpload = onCall(
           instagram: lead.social?.instagram ?? null,
           tiktok: lead.social?.tiktok ?? null,
           youtube: lead.social?.youtube ?? null,
+          facebook: lead.social?.facebook ?? null,
         },
         notes: lead.notes ?? '',
         foundVia: lead.foundVia ?? '',

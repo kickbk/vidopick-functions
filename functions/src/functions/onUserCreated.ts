@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import { auth } from 'firebase-functions/v1';
+import { getAffiliateDisplayFields } from '../utils/affiliateDisplay';
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -33,7 +34,9 @@ export const onUserCreated = auth.user().onCreate(async (user) => {
     if (affiliateSnap && !affiliateSnap.empty) {
       const affiliateDoc = affiliateSnap.docs[0];
       const affiliateRef = affiliateDoc.ref;
-      const affiliateName: string = affiliateDoc.data().name ?? 'My Profile';
+      const affiliateName: string =
+        (await getAffiliateDisplayFields(db, affiliateDoc.id)).name ??
+        'My Profile';
 
       await Promise.all([
         db.doc(`users/${user.uid}`).set(

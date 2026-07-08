@@ -1,6 +1,10 @@
 import * as admin from 'firebase-admin';
 import { onDocumentDeleted, onDocumentWritten } from 'firebase-functions/v2/firestore';
-import { generateProfileHtml, VpAffiliateProfile, VpProfileEntry } from '../utils/generateProfileHtml';
+import {
+  generateProfileHtml,
+  VpAffiliateProfile,
+  VpProfileEntry,
+} from '../utils/generateProfileHtml';
 import { generateOgImage } from '../utils/generateOgImage';
 import { buildAffiliateWelcomeEmail } from '../utils/emailTemplates';
 
@@ -8,17 +12,20 @@ if (!admin.apps.length) admin.initializeApp();
 
 async function regenerateProfile(
   affiliateId: string,
-  before?: admin.firestore.DocumentData,
+  beforeProfile?: admin.firestore.DocumentData,
   { skipOg = false } = {}
 ): Promise<void> {
   const db = admin.firestore();
+
+  // Root doc provides private/admin fields only (slug, isHidden, type).
   const affiliateSnap = await db.doc(`affiliates/${affiliateId}`).get();
-
   if (!affiliateSnap.exists) return;
-  const data = affiliateSnap.data()!;
+  const rootData = affiliateSnap.data()!;
+  if (rootData.type === 'slug') return;
 
-  // Slug pointer docs have no profile page of their own
-  if (data.type === 'slug') return;
+  // public/profile is the single source of truth for all display fields.
+  const profileSnap = await db.doc(`affiliates/${affiliateId}/public/profile`).get();
+  const profileData = profileSnap.exists ? profileSnap.data()! : {};
 
   const profilesSnap = await db
     .collection('affiliates')
@@ -34,18 +41,39 @@ async function regenerateProfile(
     thumbnails: d.data().thumbnails ?? [],
   }));
 
-  const hasAllFields = !!(data.name && data.bio && data.photo);
+  const hasAllFields = !!(profileData.name && profileData.bio && profileData.photo);
   const isPublic = hasAllFields;
-  const shouldIndex = isPublic && !data.isHidden;
+  const shouldIndex = isPublic && !rootData.isHidden;
 
-  // Write isPublic back only when it changed, to avoid retriggering this function.
-  if ((data.isPublic as boolean | undefined) !== isPublic) {
+  // Write isPublic back to root doc only when it changed (used by admin panel).
+  if ((rootData.isPublic as boolean | undefined) !== isPublic) {
     await db.doc(`affiliates/${affiliateId}`).update({ isPublic });
   }
 
-  // Generate OG image when all fields are present and name or photo changed
-  const photoChanged = before?.photo !== data.photo;
-  const nameChanged = before?.name !== data.name;
+  // Keep system fields (slug, isHidden, isPublic) in sync on public/profile
+  // so the Creators page collectionGroup query and public SPA can read them.
+  const currentSlug = profileData.slug ?? null;
+  const currentIsHidden = profileData.isHidden ?? false;
+  const currentIsPublic = profileData.isPublic ?? null;
+  const newSlug = rootData.slug ?? null;
+  const newIsHidden = rootData.isHidden ?? false;
+  if (currentSlug !== newSlug || currentIsHidden !== newIsHidden || currentIsPublic !== isPublic) {
+    await db
+      .doc(`affiliates/${affiliateId}/public/profile`)
+      .set(
+        {
+          slug: newSlug,
+          isHidden: newIsHidden,
+          isPublic,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+  }
+
+  // Generate OG image when photo or name changed (only detectable from public/profile trigger).
+  const photoChanged = beforeProfile !== undefined && beforeProfile?.photo !== profileData.photo;
+  const nameChanged = beforeProfile !== undefined && beforeProfile?.name !== profileData.name;
   const shouldGenerateOg = !skipOg && hasAllFields && (photoChanged || nameChanged);
 
   let ogImageUrl: string | undefined;
@@ -53,18 +81,16 @@ async function regenerateProfile(
     try {
       const bucket = admin.storage().bucket();
       const ogFile = bucket.file(`affiliates/${affiliateId}/og.jpg`);
-      const jpgBuffer = await generateOgImage(data.name, data.photo);
+      const jpgBuffer = await generateOgImage(profileData.name, profileData.photo);
       await ogFile.save(jpgBuffer, { contentType: 'image/jpeg' });
       await ogFile.makePublic();
       ogImageUrl = ogFile.publicUrl();
       console.log(`[generateVpProfile] OG image generated for ${affiliateId}`);
     } catch (err) {
       console.error(`[generateVpProfile] OG image generation failed for ${affiliateId}:`, err);
-      // Non-fatal — fall through, profile HTML will use the raw photo as og:image
     }
   }
 
-  // If we didn't just generate it, check if one already exists in Storage
   if (!ogImageUrl) {
     try {
       const bucket = admin.storage().bucket();
@@ -78,13 +104,13 @@ async function regenerateProfile(
 
   const profile: VpAffiliateProfile = {
     id: affiliateId,
-    slug: data.slug,
-    name: data.name ?? '',
-    title: data.title,
-    bio: data.bio,
-    photo: data.photo,
-    website: data.website,
-    socialLinks: data.socialLinks ?? [],
+    slug: rootData.slug,
+    name: profileData.name ?? '',
+    title: profileData.title,
+    bio: profileData.bio,
+    photo: profileData.photo,
+    website: profileData.website,
+    socialLinks: profileData.socialLinks ?? [],
     ogImageUrl,
     shouldIndex,
   };
@@ -98,35 +124,31 @@ async function regenerateProfile(
     metadata: { xRobots: robotsValue },
   };
 
-  // Sanitized public mirror for the /vp/{slug} SPA page. The main affiliate doc is
-  // not publicly readable (it holds payout info), so the page reads this doc instead.
-  await db.doc(`affiliates/${affiliateId}/public/profile`).set({
-    name: data.name ?? '',
-    title: data.title ?? null,
-    bio: data.bio ?? null,
-    photo: data.photo ?? null,
-    website: data.website ?? null,
-    socialLinks: data.socialLinks ?? [],
-    slug: data.slug ?? null,
-    isPublic,
-    isHidden: data.isHidden ?? false,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-
-
-  // Store under the real affiliate ID
   await bucket.file(`profile-html/${affiliateId}.html`).save(buf, opts);
 
-  // Also store under the slug so /vp/{slug} works without a Firestore lookup at serve time
-  if (data.slug) {
-    await bucket.file(`profile-html/${data.slug}.html`).save(buf, opts);
+  if (rootData.slug) {
+    await bucket.file(`profile-html/${rootData.slug}.html`).save(buf, opts);
   }
 
   console.log(
-    `[generateVpProfile] regenerated ${affiliateId}${data.slug ? ` + slug:${data.slug}` : ''} (${entries.length} profiles)`
+    `[generateVpProfile] regenerated ${affiliateId}${rootData.slug ? ` + slug:${rootData.slug}` : ''} (${entries.length} profiles)`
   );
 }
 
+// Fires when the affiliate's public/profile doc changes (affiliate saved their profile form).
+export const onVpPublicProfileDocWrite = onDocumentWritten(
+  { document: 'affiliates/{affiliateId}/public/{docId}', region: 'us-central1' },
+  async (event) => {
+    if (event.params.docId !== 'profile') return;
+    const affiliateId = event.params.affiliateId;
+
+    if (!event.data?.after?.exists) return;
+
+    await regenerateProfile(affiliateId, event.data.before?.data(), { skipOg: false });
+  }
+);
+
+// Fires when the root affiliate doc changes (slug claim, admin isHidden update, etc.).
 export const onVpAffiliateWrite = onDocumentWritten(
   { document: 'affiliates/{affiliateId}', region: 'us-central1' },
   async (event) => {
@@ -135,22 +157,33 @@ export const onVpAffiliateWrite = onDocumentWritten(
     if (!event.data?.after?.exists) {
       // Affiliate deleted — remove the stored HTML so the URL returns 404
       const before = event.data?.before?.data();
-      if (before?.type === 'slug') return; // slug pointer docs never had an HTML file
+      if (before?.type === 'slug') return;
       const bucket = admin.storage().bucket();
       await Promise.all([
-        bucket.file(`profile-html/${affiliateId}.html`).delete().catch(() => {}),
+        bucket
+          .file(`profile-html/${affiliateId}.html`)
+          .delete()
+          .catch(() => {}),
         ...(before?.slug
-          ? [bucket.file(`profile-html/${before.slug}.html`).delete().catch(() => {})]
+          ? [
+              bucket
+                .file(`profile-html/${before.slug}.html`)
+                .delete()
+                .catch(() => {}),
+            ]
           : []),
       ]);
-      console.log(`[generateVpProfile] deleted HTML for ${affiliateId}${before?.slug ? ` + slug:${before.slug}` : ''}`);
+      console.log(
+        `[generateVpProfile] deleted HTML for ${affiliateId}${before?.slug ? ` + slug:${before.slug}` : ''}`
+      );
       return;
     }
 
     const data = event.data.after.data()!;
-    if (data.type === 'slug') return; // slug pointer docs have no profile page
+    if (data.type === 'slug') return;
 
-    await regenerateProfile(affiliateId, event.data.before?.data());
+    // No beforeProfile here — OG image regeneration is handled by onVpPublicProfileDocWrite.
+    await regenerateProfile(affiliateId, undefined, { skipOg: true });
     await maybeSendWelcomeEmail(affiliateId, event.data.before?.data(), data);
   }
 );
@@ -174,7 +207,6 @@ async function maybeSendWelcomeEmail(
   if (!RESEND_API_KEY || !email) return;
 
   const db = admin.firestore();
-  // Claim the send before emailing so a concurrent retry can't double-send
   const claimed = await db.runTransaction(async (tx) => {
     const ref = db.doc(`affiliates/${affiliateId}`);
     const snap = await tx.get(ref);
@@ -185,6 +217,10 @@ async function maybeSendWelcomeEmail(
   if (!claimed) return;
 
   try {
+    // Name lives in public/profile; fetch it for the welcome email.
+    const profileSnap = await db.doc(`affiliates/${affiliateId}/public/profile`).get();
+    const name: string = profileSnap.data()?.name ?? after.name ?? 'there';
+
     const { Resend } = await import('resend');
     const resend = new Resend(RESEND_API_KEY);
     const commissionPercent = Math.round((after.commissionRate ?? 0.25) * 100);
@@ -192,11 +228,11 @@ async function maybeSendWelcomeEmail(
     const publicPageUrl = after.slug ? `https://vidopick.com/vp/${after.slug}` : null;
 
     await resend.emails.send({
-      from: 'Vidopick Partners <hello@vidopick.com>',
+      from: 'Vidopick Partners <noreply@vidopick.com>',
       to: email,
       subject: 'Welcome to Vidopick Affiliates 🎉',
       html: buildAffiliateWelcomeEmail(
-        after.name ?? 'there',
+        name,
         commissionPercent,
         publicProfilePercent,
         publicPageUrl,
@@ -205,13 +241,12 @@ async function maybeSendWelcomeEmail(
     });
     console.log(`[generateVpProfile] welcome email sent affiliateId=${affiliateId}`);
   } catch (e) {
-    // Roll back the claim so the email isn't marked sent; resend manually if needed
     await db
       .doc(`affiliates/${affiliateId}`)
       .update({ welcomeEmailSentAt: admin.firestore.FieldValue.delete() })
       .catch((rollbackErr) =>
         console.error(
-          `[generateVpProfile] welcome email rollback failed affiliateId=${affiliateId} — email is marked sent but was not delivered:`,
+          `[generateVpProfile] welcome email rollback failed affiliateId=${affiliateId}:`,
           rollbackErr
         )
       );

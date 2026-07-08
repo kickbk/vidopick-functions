@@ -1,6 +1,7 @@
 import * as admin from 'firebase-admin';
 import { onRequest } from 'firebase-functions/v2/https';
 import axios from 'axios';
+import { getAffiliateDisplayFields } from '../utils/affiliateDisplay';
 import * as dns from 'dns';
 import * as http from 'http';
 import * as https from 'https';
@@ -268,10 +269,13 @@ export const analyzeAffiliateWebsite = onRequest(
       affiliateDoc = affiliateSnap.docs[0];
     }
     const affiliate = affiliateDoc.data()!;
+    // website lives in public/profile since the root-doc strip migration;
+    // websiteSummary/websiteKeywords still live on the root doc.
+    const { website } = await getAffiliateDisplayFields(db, affiliateDoc.id);
 
-    console.log('[analyze] affiliateId:', affiliateDoc.id, 'website:', affiliate.website ?? '(not set)', 'hasSummary:', !!affiliate.websiteSummary);
+    console.log('[analyze] affiliateId:', affiliateDoc.id, 'website:', website ?? '(not set)', 'hasSummary:', !!affiliate.websiteSummary);
 
-    if (!affiliate.website) {
+    if (!website) {
       console.log('[analyze] skipped: no website field');
       res.status(200).json({ skipped: true });
       return;
@@ -294,7 +298,7 @@ export const analyzeAffiliateWebsite = onRequest(
 
     let extractedText = '';
     try {
-      const rawUrl = (affiliate.website as string).trim();
+      const rawUrl = website.trim();
       const websiteUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`;
       console.log('[analyze] fetching:', websiteUrl);
       let html = await safeFetch(websiteUrl);

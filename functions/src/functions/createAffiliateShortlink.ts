@@ -87,6 +87,10 @@ export const createAffiliateShortlink = onCall(
       }
     }
 
+    // Name lives in public/profile (the single source of truth for display fields).
+    const pubProfileSnap = await db.doc(`affiliates/${affiliateId}/public/profile`).get();
+    const affiliateName: string = (pubProfileSnap.data()?.name as string | undefined) ?? '';
+
     // Profile share link: one per affiliate, idempotent
     if (isProfileShareLink) {
       const existingId = affiliateData.profileShareShortlinkId as string | undefined;
@@ -148,11 +152,11 @@ export const createAffiliateShortlink = onCall(
             params.profile = {
               uid: pd.uid,
               profileId: pId,
-              displayName: pd.name ?? affiliateData.name,
+              displayName: pd.name ?? affiliateName,
               color: pd.color ?? 'blue',
               playlistIds: pd.playlistIds ?? [],
             };
-            params.name = affiliateData.name;
+            params.name = affiliateName;
             resolvedProfileId = pId;
           }
         }
@@ -169,11 +173,11 @@ export const createAffiliateShortlink = onCall(
         params.profile = {
           uid: ownerUid,
           profileId,
-          displayName: profileData.name ?? affiliateData.name,
+          displayName: profileData.name ?? affiliateName,
           color: profileData.color ?? 'blue',
           playlistIds: profileData.playlistIds ?? [],
         };
-        params.name = affiliateData.name;
+        params.name = affiliateName;
         resolvedProfileId = profileId;
       }
     }
@@ -195,7 +199,7 @@ export const createAffiliateShortlink = onCall(
     }
 
     const docData: Record<string, any> = {
-      linkTitle: `${affiliateData.name} – ${effectiveLabel}`,
+      linkTitle: `${affiliateName} – ${effectiveLabel}`,
       label: effectiveLabel,
       linkType: 'referral',
       affiliateId,

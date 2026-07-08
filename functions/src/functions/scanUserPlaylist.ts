@@ -199,7 +199,7 @@ async function sendModerationEmail(playlistData: {
   const resend = new Resend(RESEND_API_KEY);
   await resend.emails
     .send({
-      from: 'Vidopick <hello@vidopick.com>',
+      from: 'Vidopick <noreply@vidopick.com>',
       to: 'notifications@vidopick.com',
       subject: `📱 User-Added Content: "${playlistData.title}"`,
       html: `
@@ -406,7 +406,9 @@ IMPORTANT for languages: always return an array. Rules: (1) Explicit labels like
           .status(404)
           .json({ error: `${itemLabel} not found on YouTube. It may be private or deleted.` });
       } else {
-        res.status(500).json({ error: `Failed to scan ${itemLabel.toLowerCase()}`, details: error.message });
+        res
+          .status(500)
+          .json({ error: `Failed to scan ${itemLabel.toLowerCase()}`, details: error.message });
       }
     }
   }

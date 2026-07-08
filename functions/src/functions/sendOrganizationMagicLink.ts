@@ -49,7 +49,9 @@ function verifyTurnstile(token: string): Promise<boolean> {
             // Non-JSON response (e.g. WAF block from cloud IP) — treat as a
             // service problem the client can retry, not a free pass.
             console.error('[Turnstile] Non-JSON response from siteverify');
-            reject(new HttpsError('unavailable', 'Verification service unavailable. Please try again.'));
+            reject(
+              new HttpsError('unavailable', 'Verification service unavailable. Please try again.')
+            );
           }
         });
       }
@@ -153,7 +155,7 @@ export const sendOrganizationInvite = onCall(async (request) => {
 
     const resend = new Resend(RESEND_API_KEY);
     await resend.emails.send({
-      from: 'Vidopick <hello@vidopick.com>',
+      from: 'Vidopick <noreply@vidopick.com>',
       to: email,
       subject: `${orgName} invites you to Vidopick`,
       html: buildMemberInviteEmail(name, orgName, canApprovePro, signInLink),
@@ -193,7 +195,7 @@ export const sendOrganizationInvite = onCall(async (request) => {
 
   const resend = new Resend(RESEND_API_KEY);
   await resend.emails.send({
-    from: 'Vidopick <hello@vidopick.com>',
+    from: 'Vidopick <noreply@vidopick.com>',
     to: email,
     subject: "You're invited to Vidopick",
     html: buildInviteEmail(name, signInLink),
@@ -259,7 +261,7 @@ export const sendSignInLink = onCall({ enforceAppCheck: true }, async (request) 
 
   const resend = new Resend(RESEND_API_KEY);
   await resend.emails.send({
-    from: 'Vidopick <hello@vidopick.com>',
+    from: 'Vidopick <noreply@vidopick.com>',
     to: email,
     subject: 'Your Vidopick sign-in link',
     html: buildSignInEmail(signInLink),

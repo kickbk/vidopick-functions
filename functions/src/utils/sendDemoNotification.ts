@@ -4,7 +4,7 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const NOTIFY_EMAIL = 'support@vidopick.com';
 
 /**
- * Sends a demo session notification to hello@vidopick.com via Resend.
+ * Sends a demo session notification to noreply@vidopick.com via Resend.
  * Fire-and-forget — errors are logged but never thrown.
  */
 export async function sendDemoNotification(
@@ -26,7 +26,7 @@ export async function sendDemoNotification(
   const resend = new Resend(RESEND_API_KEY);
   try {
     await resend.emails.send({
-      from: 'Vidopick <hello@vidopick.com>',
+      from: 'Vidopick <noreply@vidopick.com>',
       to: NOTIFY_EMAIL,
       subject: `Demo ${event === 'requested' ? 'invite requested' : 'session started'} — ${who}`,
       html: `

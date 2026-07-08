@@ -198,7 +198,7 @@ export const requestProRefund = onCall(
         const subscriptionType: string = userData.subscriptionInterval ?? 'month';
 
         await resend.emails.send({
-          from: 'Vidopick <hello@vidopick.com>',
+          from: 'Vidopick <noreply@vidopick.com>',
           to: OWNER_EMAIL,
           subject: `${isTestMode ? '[TEST] ' : ''}Refund issued — $${refundDollars} (Pro ${subscriptionType === 'year' ? 'Annual' : 'Monthly'})`,
           html: buildOwnerRefundEmail(

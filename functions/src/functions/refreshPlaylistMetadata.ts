@@ -173,8 +173,8 @@ async function sendNotificationEmail(
 
   try {
     await resend.emails.send({
-      from: 'Vidopick <hello@vidopick.com>',
-      to: 'info@vidopick.com',
+      from: 'Vidopick <noreply@vidopick.com>',
+      to: 'notifications@vidopick.com',
       subject: `Vidopick Content Changes Detected - ${updates.length} Updated, ${removals.length} Removed`,
       html: `
       <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">

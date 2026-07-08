@@ -25,7 +25,8 @@
     "importLeads": "node scripts/importLeads.mjs",
     "compressOrgLogos": "node scripts/compressOrgLogos.mjs",
     "syncAlgolia": "node lib/functions/syncAlgolia.js",
-    "testDL": "adb shell am start -a android.intent.action.VIEW -d 'https://vpk.to/momomop'"
+    "testDL": "adb shell am start -a android.intent.action.VIEW -d 'https://vpk.to/momomop'",
+    "deck": "node scripts/generate-deck-link.mjs"
   },
   "engines": {
     "node": "22"

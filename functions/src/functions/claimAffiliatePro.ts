@@ -1,5 +1,6 @@
 import * as admin from 'firebase-admin';
 import { HttpsError, onCall } from 'firebase-functions/v2/https';
+import { getAffiliateDisplayFields } from '../utils/affiliateDisplay';
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -43,7 +44,9 @@ export const claimAffiliatePro = onCall(
     }
 
     const affiliateDoc = affiliateSnap.docs[0];
-    const affiliateName: string = affiliateDoc.data().name ?? 'My Profile';
+    const affiliateName: string =
+      (await getAffiliateDisplayFields(db, affiliateDoc.id)).name ??
+      'My Profile';
 
     await Promise.all([
       db.doc(`users/${uid}`).set(

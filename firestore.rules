@@ -389,11 +389,20 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['description']);
       }
 
-      // Sanitized public mirror (name/title/bio/photo/website/slug only), maintained by
-      // the onVpAffiliateWrite trigger. This is what the public /vp/{slug} page reads.
+      // Public profile doc (affiliates/{id}/public/profile) — single source of truth
+      // for display fields. The affiliate writes their own profile fields directly here.
+      // System fields (slug, isPublic, isHidden, updatedAt) are written by Cloud Functions.
       match /public/{docId} {
         allow read: if true;
         allow write: if isAdmin();
+        allow create: if docId == 'profile'
+          && isSignedIn()
+          && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == request.auth.uid
+          && request.resource.data.keys().hasOnly(['name', 'bio', 'title', 'photo', 'website', 'socialLinks']);
+        allow update: if docId == 'profile'
+          && isSignedIn()
+          && get(/databases/$(database)/documents/affiliates/$(affiliateId)).data.authUid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'bio', 'title', 'photo', 'website', 'socialLinks']);
       }
 
       // Internal admin notes — never visible to the affiliate or the public.

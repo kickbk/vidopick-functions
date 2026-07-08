@@ -12,6 +12,7 @@ import {
   buildOwnerTrialStartEmail,
 } from '../utils/emailTemplates';
 import { notifyUser } from '../utils/notifyUser';
+import { getAffiliateDisplayFields } from '../utils/affiliateDisplay';
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -199,7 +200,8 @@ async function createAffiliateCommission(
       const { Resend } = await import('resend');
       const resend = new Resend(RESEND_API_KEY);
       const affiliateEmail: string = affiliateData.email ?? '';
-      const affiliateName: string = affiliateData.name ?? 'Affiliate';
+      const affiliateName: string =
+        (await getAffiliateDisplayFields(db, affiliateId)).name ?? 'Affiliate';
       const amountDollars = (amountPaidCents / 100).toFixed(2);
       const commissionDollarsStr = (commissionCents / 100).toFixed(2);
       const subType: string = meta.subscriptionType ?? 'month';
@@ -210,7 +212,7 @@ async function createAffiliateCommission(
       if (affiliateEmail) {
         sends.push(
           resend.emails.send({
-            from: 'Vidopick Partners <hello@vidopick.com>',
+            from: 'Vidopick Partners <noreply@vidopick.com>',
             to: affiliateEmail,
             subject: `🎉 You made a sale — $${commissionDollarsStr} commission earned`,
             html: buildAffiliateSaleEmail(
@@ -227,7 +229,7 @@ async function createAffiliateCommission(
 
       sends.push(
         resend.emails.send({
-          from: 'Vidopick <hello@vidopick.com>',
+          from: 'Vidopick <noreply@vidopick.com>',
           to: OWNER_EMAIL,
           subject: `💰 New Vidopick sale — $${amountDollars} (${subType === 'year' ? 'Annual' : 'Monthly'})`,
           html: buildOwnerSaleEmail(
@@ -557,7 +559,7 @@ export const stripeWebhook = onRequest(
                     }
                   } catch {}
                   await resend.emails.send({
-                    from: 'Vidopick <hello@vidopick.com>',
+                    from: 'Vidopick <noreply@vidopick.com>',
                     to: OWNER_EMAIL,
                     subject: `${isTestMode ? '[TEST] ' : ''}🆕 New free trial — ${customerEmail} (${interval === 'year' ? 'Annual' : 'Monthly'})`,
                     html: buildOwnerTrialStartEmail(
@@ -578,15 +580,17 @@ export const stripeWebhook = onRequest(
               // Notify the referring affiliate (if any) that a trial started via their link.
               // Guard: only fire for genuine first trials — prevUserData.stripeActivatedAt is
               // unset for first-time buyers (read before the update above sets it).
-              const trialAffiliateId: string | undefined =
-                !prevUserData.stripeActivatedAt ? prevUserData.referredByAffiliateId : undefined;
+              const trialAffiliateId: string | undefined = !prevUserData.stripeActivatedAt
+                ? prevUserData.referredByAffiliateId
+                : undefined;
               if (trialAffiliateId) {
                 try {
                   const date = new Date().toISOString().slice(0, 10);
                   const affiliateSnap = await db.doc(`affiliates/${trialAffiliateId}`).get();
                   const affiliateData = affiliateSnap.data() ?? {};
                   const affiliateEmail: string = affiliateData.email ?? '';
-                  const affiliateName: string = affiliateData.name ?? 'Affiliate';
+                  const affiliateName: string =
+                    (await getAffiliateDisplayFields(db, trialAffiliateId)).name ?? 'Affiliate';
                   await Promise.all([
                     db
                       .collection(`affiliates/${trialAffiliateId}/dailyStats`)
@@ -603,7 +607,11 @@ export const stripeWebhook = onRequest(
                           db
                             .doc(`shortLinks/${prevUserData.referredByShortlinkId}`)
                             .set(
-                              { analytics: { trialConversions: admin.firestore.FieldValue.increment(1) } },
+                              {
+                                analytics: {
+                                  trialConversions: admin.firestore.FieldValue.increment(1),
+                                },
+                              },
                               { merge: true }
                             ),
                         ]
@@ -615,7 +623,7 @@ export const stripeWebhook = onRequest(
                     const { Resend } = await import('resend');
                     const resend = new Resend(RESEND_API_KEY);
                     await resend.emails.send({
-                      from: 'Vidopick <hello@vidopick.com>',
+                      from: 'Vidopick <noreply@vidopick.com>',
                       to: affiliateEmail,
                       subject: `${isTestMode ? '[TEST] ' : ''}🌱 New free trial via your link`,
                       html: buildAffiliateTrialEmail(
@@ -624,7 +632,9 @@ export const stripeWebhook = onRequest(
                         'https://vidopick.com/vp/dashboard'
                       ),
                     });
-                    console.log(`[stripeWebhook] affiliate trial email sent affiliateId=${trialAffiliateId} uid=${uid}`);
+                    console.log(
+                      `[stripeWebhook] affiliate trial email sent affiliateId=${trialAffiliateId} uid=${uid}`
+                    );
                   }
                 } catch (e) {
                   console.warn('[stripeWebhook] affiliate trial notification failed:', e);
@@ -673,7 +683,7 @@ export const stripeWebhook = onRequest(
                     } catch {}
                     const amountDollars = (amountTotal / 100).toFixed(2);
                     await resend.emails.send({
-                      from: 'Vidopick <hello@vidopick.com>',
+                      from: 'Vidopick <noreply@vidopick.com>',
                       to: OWNER_EMAIL,
                       subject: `${isTestMode ? '[TEST] ' : ''}💰 New Vidopick sale — $${amountDollars} (${interval === 'year' ? 'Annual' : 'Monthly'})`,
                       html: buildOwnerDirectSaleEmail(
@@ -776,7 +786,7 @@ export const stripeWebhook = onRequest(
                 const subType: string =
                   (await db.doc(`users/${uid2}`).get()).data()?.subscriptionInterval ?? 'month';
                 await resend.emails.send({
-                  from: 'Vidopick <hello@vidopick.com>',
+                  from: 'Vidopick <noreply@vidopick.com>',
                   to: OWNER_EMAIL,
                   subject: `${isTestMode ? '[TEST] ' : ''}↩️ Subscription reactivated — ${customerEmail}`,
                   html: buildOwnerUncancellationEmail(
@@ -870,7 +880,7 @@ export const stripeWebhook = onRequest(
                 } catch {}
                 const subType: string = userData2.subscriptionInterval ?? 'month';
                 await resend.emails.send({
-                  from: 'Vidopick <hello@vidopick.com>',
+                  from: 'Vidopick <noreply@vidopick.com>',
                   to: OWNER_EMAIL,
                   subject: `${isTestMode ? '[TEST] ' : ''}❌ Subscription cancelled — ${customerEmail}${isTrial ? ' (trial)' : ''}`,
                   html: buildOwnerCancellationEmail(
@@ -1001,7 +1011,7 @@ export const stripeWebhook = onRequest(
                   } catch {}
                   const subType: string = fallbackUserData.subscriptionInterval ?? 'month';
                   await resend.emails.send({
-                    from: 'Vidopick <hello@vidopick.com>',
+                    from: 'Vidopick <noreply@vidopick.com>',
                     to: OWNER_EMAIL,
                     subject: `${isTestMode ? '[TEST] ' : ''}❌ Subscription cancelled — ${customerEmail}${isTrial ? ' (trial)' : ''}`,
                     html: buildOwnerCancellationEmail(
@@ -1245,7 +1255,7 @@ export const stripeWebhook = onRequest(
                     const dollars = (amountDue / 100).toFixed(2);
                     const resend = new Resend(RESEND_API_KEY);
                     await resend.emails.send({
-                      from: 'Vidopick <hello@vidopick.com>',
+                      from: 'Vidopick <noreply@vidopick.com>',
                       to: orgAuthUser.email,
                       subject: `Action required: Payment failed for ${orgName}`,
                       html: `

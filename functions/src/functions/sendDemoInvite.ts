@@ -82,7 +82,7 @@ export const sendDemoInvite = onCall(async (request) => {
 
   const resend = new Resend(RESEND_API_KEY);
   await resend.emails.send({
-    from: 'Vidopick <hello@vidopick.com>',
+    from: 'Vidopick <noreply@vidopick.com>',
     to: recipientEmail,
     subject: 'Your Vidopick demo access link',
     html: buildDemoAccessEmail(recipientEmail, signInLink),

@@ -21,7 +21,16 @@ export const sendAffiliateOutreachEmail = onCall({ region: 'us-central1' }, asyn
   if (!snap.exists) throw new HttpsError('not-found', 'Lead not found.');
 
   const lead = snap.data()!;
-  if (lead.status !== 'approved') {
+  const sendableStatuses = [
+    'approved',
+    'send_failed',
+    'sent',
+    'delivered',
+    'bounced',
+    'complained',
+    'booked',
+  ];
+  if (!sendableStatuses.includes(lead.status)) {
     throw new HttpsError(
       'failed-precondition',
       `Lead status is "${lead.status}", expected "approved".`
@@ -88,7 +97,11 @@ function esc(s: string): string {
     .replace(/'/g, '&#39;');
 }
 
-function buildOutreachEmail(displayName: string, opening: string | null, activationLink: string): string {
+function buildOutreachEmail(
+  displayName: string,
+  opening: string | null,
+  activationLink: string
+): string {
   const name = esc(displayName);
   const safeLink = esc(activationLink);
   const openingHtml = opening
@@ -102,7 +115,7 @@ function buildOutreachEmail(displayName: string, opening: string | null, activat
 
   ${openingHtml}
 
-  <p style="font-size:15px;line-height:1.7;margin:0 0 16px">I'm Ben, a dad of two and a software engineer. I got tired of YouTube's algorithm steering my kids into autoplay and random recommendations, so I built a video player where parents handpick exactly which playlists their kids can watch. Tapping into individual videos is disabled, so there's no rabbit hole. There's a library of 5,000+ vetted playlists across 50+ languages to choose from.</p>
+  <p style="font-size:15px;line-height:1.7;margin:0 0 16px">I'm Ben, a dad of two and a software engineer. I got tired of YouTube's algorithm steering my kids into autoplay and random recommendations, so I built a video player where parents handpick exactly which playlists their kids can watch. Tapping into individual videos is disabled, so there's no rabbit hole. There's a library of 6,500+ vetted playlists across 50+ languages to choose from.</p>
 
   <p style="font-size:15px;line-height:1.7;margin:0 0 16px">The Pro tier is where it gets powerful for parents. It's a paid subscription with daily viewing-time limits, per-profile viewing stats, and the ability to share curated profiles with other parents.</p>
 
@@ -115,6 +128,13 @@ function buildOutreachEmail(displayName: string, opening: string | null, activat
     <li>Pro access the moment you're set up, so you can build the playlist profiles you'll actually share. Your recommendations, your invite.</li>
   </ul>
 
+  <p style="font-size:15px;line-height:1.7;margin:0 0 16px">Have a look at two existing affiliate pages:</p>
+
+  <p style="font-size:15px;line-height:1.7;margin:0 0 16px">
+    <a href="https://vidopick.com/vp/digitalmom" style="color:#2563eb;text-decoration:none">vidopick.com/vp/digitalmom</a><br>
+    <a href="https://vidopick.com/vp/jodiemyers" style="color:#2563eb;text-decoration:none">vidopick.com/vp/jodiemyers</a>
+  </p>
+  
   <p style="font-size:15px;line-height:1.7;margin:0 0 16px">The recurring share is well beyond the one-time payouts most parenting brands offer, and the discount means you're handing your people a real deal, not a sales pitch.</p>
 
   <p style="font-size:15px;line-height:1.7;margin:0 0 8px">Your activation link is personal to you. Use it to set up your affiliate account, then log into Vidopick with the same email and Pro is already on, ready for you to build your first profile:</p>
@@ -122,6 +142,8 @@ function buildOutreachEmail(displayName: string, opening: string | null, activat
   <p style="margin:0 0 32px">
     <a href="${safeLink}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:13px 24px;border-radius:9px;font-size:15px;font-weight:600">Set up your affiliate account →</a>
   </p>
+
+  <p style="font-size:15px;line-height:1.7;margin:0 0 8px">I'd love to have you on board. The setup's quick, and I'm around if you have questions.</p>
 
   <p style="font-size:15px;line-height:1.7;margin:0 0 24px">Best,</p>
 

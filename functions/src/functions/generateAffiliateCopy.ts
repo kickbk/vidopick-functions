@@ -2,6 +2,7 @@ import * as admin from 'firebase-admin';
 import { onRequest } from 'firebase-functions/v2/https';
 import axios from 'axios';
 import { checkRateLimit } from '../utils/rateLimit';
+import { getAffiliateDisplayFields } from '../utils/affiliateDisplay';
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
@@ -129,6 +130,7 @@ export const generateAffiliateCopy = onRequest(
     }
 
     let affiliate: FirebaseFirestore.DocumentData;
+    let resolvedAffiliateId: string;
     if (affiliateId) {
       if (!callerIsAdmin) {
         res.status(403).json({ error: 'Forbidden' });
@@ -140,6 +142,7 @@ export const generateAffiliateCopy = onRequest(
         return;
       }
       affiliate = affiliateDoc.data()!;
+      resolvedAffiliateId = affiliateDoc.id;
     } else {
       const affiliateSnap = await db
         .collection('affiliates')
@@ -152,6 +155,7 @@ export const generateAffiliateCopy = onRequest(
         return;
       }
       affiliate = affiliateSnap.docs[0].data();
+      resolvedAffiliateId = affiliateSnap.docs[0].id;
     }
 
     if (!OPENAI_API_KEY) {
@@ -159,10 +163,13 @@ export const generateAffiliateCopy = onRequest(
       return;
     }
 
+    // name/website/bio live in public/profile since the root-doc strip migration;
+    // websiteSummary/websiteKeywords still live on the root doc.
+    const display = await getAffiliateDisplayFields(db, resolvedAffiliateId);
     const contextLines: string[] = [];
-    if (affiliate.name) contextLines.push(`The affiliate's name is ${affiliate.name}.`);
-    if (affiliate.website) contextLines.push(`Their website: ${affiliate.website}`);
-    if (affiliate.bio) contextLines.push(`In their own words: ${affiliate.bio}`);
+    if (display.name) contextLines.push(`The affiliate's name is ${display.name}.`);
+    if (display.website) contextLines.push(`Their website: ${display.website}`);
+    if (display.bio) contextLines.push(`In their own words: ${display.bio}`);
     if (affiliate.websiteSummary) contextLines.push(`About them (from website analysis): ${affiliate.websiteSummary}`);
     if (affiliate.websiteKeywords?.length) {
       contextLines.push(`Their audience/focus: ${(affiliate.websiteKeywords as string[]).join(', ')}`);

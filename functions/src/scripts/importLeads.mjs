@@ -72,6 +72,7 @@ for (const lead of leads) {
       instagram: lead.social?.instagram ?? null,
       tiktok: lead.social?.tiktok ?? null,
       youtube: lead.social?.youtube ?? null,
+      facebook: lead.social?.facebook ?? null,
     },
     notes: lead.notes ?? '',
     foundVia: lead.foundVia ?? '',

@@ -102,12 +102,18 @@ export { addPublicProfile } from './functions/addPublicProfile';
 export { removePublicProfile } from './functions/removePublicProfile';
 export { onProfileSharingDisabled } from './functions/onProfileSharingDisabled';
 export { onAffiliateProfilePlaylistsChanged } from './functions/onAffiliateProfilePlaylistsChanged';
-export { onVpAffiliateWrite, onVpPublicProfileWrite, onVidopickProfileDeleted } from './functions/generateVpProfile';
+export { onVpAffiliateWrite, onVpPublicProfileDocWrite, onVpPublicProfileWrite, onVidopickProfileDeleted } from './functions/generateVpProfile';
 export { serveVpProfile } from './functions/serveVpProfile';
 export { serveSitemap } from './functions/serveSitemap';
 export { analyzeAffiliateWebsite } from './functions/analyzeAffiliateWebsite';
 export { generateAffiliateCopy } from './functions/generateAffiliateCopy';
 export { sendAffiliateOutreachEmail } from './functions/sendAffiliateOutreachEmail';
+export {
+  submitDeckRequest,
+  approveDeckRequest,
+  validateDeckToken,
+  generateDeckLink,
+} from './functions/deckAccess';
 export { resendOutreachWebhook } from './functions/resendOutreachWebhook';
 export { importLeadsFromUpload } from './functions/importLeadsFromUpload';
 export { activateAffiliateJoin } from './functions/activateAffiliateJoin';

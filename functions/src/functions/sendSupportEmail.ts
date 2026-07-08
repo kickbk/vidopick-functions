@@ -81,7 +81,7 @@ export const sendSupportEmail = onRequest({ cors: true }, async (request, respon
 
     // Email to you (the support team)
     await resend.emails.send({
-      from: 'Vidopick <hello@vidopick.com>',
+      from: 'Vidopick <noreply@vidopick.com>',
       to: 'support@vidopick.com',
       replyTo: email.trim(),
       subject: `Vidopick Support Request from ${name.trim().replace(/[\r\n]+/g, ' ')}`,
@@ -110,7 +110,7 @@ export const sendSupportEmail = onRequest({ cors: true }, async (request, respon
     // submissions alike, bounded by the per-recipient limit above.
     if (autoReplyAllowed) {
       await resend.emails.send({
-        from: 'Vidopick <hello@vidopick.com>',
+        from: 'Vidopick <noreply@vidopick.com>',
         to: email.trim(),
         subject: 'We received your message - Vidopick Support',
         html: `
