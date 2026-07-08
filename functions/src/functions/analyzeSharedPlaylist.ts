@@ -193,16 +193,21 @@ async function sendModerationEmail(playlistData: any) {
     return;
   }
 
+  // Channel uploads-playlists have IDs starting with "UU" (derived from the
+  // channel's "UC" ID); everything else is a regular playlist.
+  const isChannel = typeof playlistData.id === 'string' && playlistData.id.startsWith('UU');
+  const label = isChannel ? 'Channel' : 'Playlist';
+
   const resend = new Resend(RESEND_API_KEY);
   try {
     await resend.emails.send({
       from: 'Vidopick <noreply@vidopick.com>',
       to: 'notifications@vidopick.com',
-      subject: `📝 New Playlist Submitted: "${playlistData.title}"`,
+      subject: `📝 New ${label} Submitted: "${playlistData.title}"`,
       html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #ddd; border-radius: 8px; padding: 20px;">
-        <h2 style="color: #2c3e50; margin-top: 0;">New Playlist Submission</h2>
-        <p>A user shared a new playlist via the Vidopick app. It has been saved but requires approval.</p>
+        <h2 style="color: #2c3e50; margin-top: 0;">New ${label} Submission</h2>
+        <p>A user shared a new ${label.toLowerCase()} via the Vidopick app. It has been saved but requires approval.</p>
 
         <div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; margin: 20px 0;">
           <h3 style="margin: 0 0 10px 0;">${playlistData.title}</h3>
@@ -211,6 +216,11 @@ async function sendModerationEmail(playlistData: any) {
           <p style="margin: 5px 0;"><strong>AI Score:</strong> ${playlistData.ranking.factors.aiScore}/10</p>
           <p style="margin: 5px 0;"><strong>Tags:</strong> ${playlistData.tags.join(', ')}</p>
           <p style="margin: 5px 0;"><strong>ID:</strong> ${playlistData.id}</p>
+          <p style="margin: 5px 0;"><strong>Submitted by (UID):</strong> ${
+            playlistData.submittedBy
+              ? `<a href="https://console.firebase.google.com/u/0/project/${process.env.GCLOUD_PROJECT}/firestore/data/~2Fusers~2F${playlistData.submittedBy}">${playlistData.submittedBy}</a>`
+              : 'Unknown (not signed in)'
+          }</p>
         </div>
 
         <div style="text-align: center; margin: 25px 0;">
@@ -219,7 +229,7 @@ async function sendModerationEmail(playlistData: any) {
         </div>
 
         <p style="color: #7f8c8d; font-size: 12px; margin-top: 20px;">
-          This playlist is currently set to <strong>isApproved: false</strong>. Users can see it in their personal library, but it won't appear in public discovery until approved.
+          This ${label.toLowerCase()} is currently set to <strong>isApproved: false</strong>. Users can see it in their personal library, but it won't appear in public discovery until approved.
         </p>
       </div>
     `,
@@ -244,7 +254,14 @@ export const analyzeSharedPlaylist = onRequest(
       return;
     }
 
-    let { playlistId, channelHandle } = request.body;
+    let { playlistId, channelHandle, firebaseUid } = request.body;
+
+    // Optional: UID of the user who shared the playlist (for moderation email).
+    // Sanitize to a plausible Firebase UID; otherwise treat as anonymous.
+    const submittedBy: string | null =
+      typeof firebaseUid === 'string' && /^[A-Za-z0-9]{1,128}$/.test(firebaseUid)
+        ? firebaseUid
+        : null;
 
     // Resolve a channel @handle to its UU uploads-playlist ID via YouTube API
     if (!playlistId && channelHandle) {
@@ -424,6 +441,7 @@ IMPORTANT for languages field: always return an array. Rules: (1) Explicit label
 
         scannedAt: new Date().toISOString(),
         scannedBy: 'share',
+        submittedBy,
         updatedAt: new Date().toISOString(),
 
         videoCount: data.totalCount,

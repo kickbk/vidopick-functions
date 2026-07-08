@@ -191,21 +191,27 @@ async function sendModerationEmail(playlistData: {
   videoCount: number;
   ranking: { factors: { aiScore: number } };
   tags: string[];
+  submittedBy: string[];
 }) {
   if (!RESEND_API_KEY) {
     console.warn('[email] RESEND_API_KEY not set, skipping');
     return;
   }
+  // Channel uploads-playlists have IDs starting with "UU" (derived from the
+  // channel's "UC" ID); everything else is a regular playlist.
+  const isChannel = typeof playlistData.id === 'string' && playlistData.id.startsWith('UU');
+  const label = isChannel ? 'Channel' : 'Playlist';
+
   const resend = new Resend(RESEND_API_KEY);
   await resend.emails
     .send({
       from: 'Vidopick <noreply@vidopick.com>',
       to: 'notifications@vidopick.com',
-      subject: `📱 User-Added Content: "${playlistData.title}"`,
+      subject: `📱 User-Added ${label}: "${playlistData.title}"`,
       html: `
       <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #ddd;border-radius:8px;padding:20px;">
-        <h2 style="color:#2c3e50;margin-top:0;">User-Added Content (pending review)</h2>
-        <p>A user imported a playlist or channel not yet in the approved library. It is saved in <strong>scannedPlaylists</strong> with <code>isApproved: false</code>.</p>
+        <h2 style="color:#2c3e50;margin-top:0;">User-Added ${label} (pending review)</h2>
+        <p>A user imported a ${label.toLowerCase()} not yet in the approved library. It is saved in <strong>scannedPlaylists</strong> with <code>isApproved: false</code>.</p>
         <div style="background:#f8f9fa;padding:15px;border-radius:6px;margin:20px 0;">
           <h3 style="margin:0 0 10px 0;">${playlistData.title}</h3>
           <p style="margin:5px 0;"><strong>Author:</strong> ${playlistData.author}</p>
@@ -213,6 +219,11 @@ async function sendModerationEmail(playlistData: {
           <p style="margin:5px 0;"><strong>AI Score:</strong> ${playlistData.ranking.factors.aiScore}/10</p>
           <p style="margin:5px 0;"><strong>Tags:</strong> ${playlistData.tags.join(', ')}</p>
           <p style="margin:5px 0;"><strong>ID:</strong> ${playlistData.id}</p>
+          <p style="margin:5px 0;"><strong>Submitted by (UID):</strong> ${
+            playlistData.submittedBy?.[0]
+              ? `<a href="https://console.firebase.google.com/project/${process.env.GCLOUD_PROJECT}/firestore/data/~2Fusers~2F${playlistData.submittedBy[0]}">${playlistData.submittedBy[0]}</a>`
+              : 'Unknown'
+          }</p>
         </div>
         <div style="text-align:center;margin:25px 0;">
           <a href="https://www.youtube.com/playlist?list=${playlistData.id}" style="background:#e74c3c;color:white;padding:10px 20px;text-decoration:none;border-radius:5px;margin-right:10px;">View on YouTube</a>
