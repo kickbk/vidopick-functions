@@ -8,8 +8,24 @@ const RESEND_WEBHOOK_SECRET = process.env.RESEND_WEBHOOK_SECRET;
 
 const STATUS_TRANSITIONS: Record<string, string> = {
   'email.delivered': 'delivered',
+  'email.delivery_delayed': 'delayed',
   'email.bounced': 'bounced',
   'email.complained': 'complained',
+  'email.failed': 'failed',
+};
+
+// Monotonic precedence: a webhook only moves the lead forward, never backward, so
+// out-of-order events (a late 'delayed' after 'delivered', a stray delivery event
+// after a call was 'booked') can't clobber a more final state. Statuses not listed
+// (e.g. 'approved') rank below 'sent' so any real delivery status supersedes them.
+const STATUS_RANK: Record<string, number> = {
+  sent: 0,
+  delayed: 1,
+  delivered: 2,
+  bounced: 3,
+  complained: 3,
+  failed: 3,
+  booked: 4,
 };
 
 export const resendOutreachWebhook = onRequest(
@@ -56,7 +72,7 @@ export const resendOutreachWebhook = onRequest(
 
     const db = admin.firestore();
     const snap = await db
-      .collection('outreach_affiliates')
+      .collection('affiliatesOutreach')
       .where('resendMessageId', '==', messageId)
       .limit(1)
       .get();
@@ -70,10 +86,11 @@ export const resendOutreachWebhook = onRequest(
     const docRef = snap.docs[0].ref;
     const currentStatus = snap.docs[0].data().status as string;
 
-    // Only advance to 'delivered' if currently 'sent' — don't downgrade a later state.
-    // Bounce and complained always apply.
-    if (newStatus === 'delivered' && currentStatus !== 'sent') {
-      res.status(200).json({ skipped: true, reason: 'status already past sent' });
+    // Only advance forward — never downgrade an already more-final status.
+    if ((STATUS_RANK[newStatus] ?? 0) <= (STATUS_RANK[currentStatus] ?? -1)) {
+      res
+        .status(200)
+        .json({ skipped: true, reason: `status ${currentStatus} not downgraded to ${newStatus}` });
       return;
     }
 

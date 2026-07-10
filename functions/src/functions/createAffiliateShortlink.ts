@@ -8,7 +8,7 @@ if (!admin.apps.length) admin.initializeApp();
 const stripeSecretKey = defineSecret('STRIPE_SECRET_KEY');
 const stripeSecretKeyTest = defineSecret('STRIPE_SECRET_KEY_TEST');
 
-const RESERVED_SLUGS = new Set(['auth-redirect', 'device-auth']);
+const RESERVED_SLUGS = new Set(['auth-redirect', 'device-auth', 'confirm-delete']);
 
 export const createAffiliateShortlink = onCall(
   { region: 'us-central1', memory: '256MiB', secrets: [stripeSecretKey, stripeSecretKeyTest] },

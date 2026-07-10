@@ -23,6 +23,20 @@ async function regenerateProfile(
   const rootData = affiliateSnap.data()!;
   if (rootData.type === 'slug') return;
 
+  // Disabled affiliate (e.g. owner deleted their account): tear down the public page
+  // instead of regenerating it, so this write-triggered pass doesn't resurrect it.
+  if (rootData.isDisabled) {
+    const bucket = admin.storage().bucket();
+    await Promise.all([
+      bucket.file(`profile-html/${affiliateId}.html`).delete().catch(() => {}),
+      ...(rootData.slug
+        ? [bucket.file(`profile-html/${rootData.slug}.html`).delete().catch(() => {})]
+        : []),
+    ]);
+    console.log(`[generateVpProfile] affiliate ${affiliateId} disabled — HTML removed, skip regen`);
+    return;
+  }
+
   // public/profile is the single source of truth for all display fields.
   const profileSnap = await db.doc(`affiliates/${affiliateId}/public/profile`).get();
   const profileData = profileSnap.exists ? profileSnap.data()! : {};
@@ -144,9 +158,44 @@ export const onVpPublicProfileDocWrite = onDocumentWritten(
 
     if (!event.data?.after?.exists) return;
 
-    await regenerateProfile(affiliateId, event.data.before?.data(), { skipOg: false });
+    const beforeProfile = event.data.before?.data();
+    const afterProfile = event.data.after.data()!;
+
+    await regenerateProfile(affiliateId, beforeProfile, { skipOg: false });
+
+    // Keep the affiliate's app account name in sync with their display name. This matters
+    // when an admin corrects a misspelled name after sendAffiliateInvite pre-provisioned
+    // the account: the name is frozen onto users/{authUid}.name + the Auth displayName at
+    // invite time and would otherwise stay wrong — seeding the first in-app profile with it.
+    const newName = (afterProfile.name as string | undefined)?.trim();
+    const oldName = (beforeProfile?.name as string | undefined)?.trim();
+    if (newName && newName !== oldName) {
+      await syncAffiliateNameToAccount(affiliateId, newName);
+    }
   }
 );
+
+/**
+ * Propagate an affiliate's display name onto their linked app account
+ * (users/{authUid}.name + Firebase Auth displayName). No-op until the account
+ * has been provisioned (authUid set on the root doc).
+ */
+async function syncAffiliateNameToAccount(affiliateId: string, name: string): Promise<void> {
+  const db = admin.firestore();
+  const rootSnap = await db.doc(`affiliates/${affiliateId}`).get();
+  const authUid = rootSnap.data()?.authUid as string | undefined;
+  if (!authUid) return;
+
+  await db.doc(`users/${authUid}`).set({ name }, { merge: true });
+  await admin
+    .auth()
+    .updateUser(authUid, { displayName: name })
+    .catch((e) =>
+      console.warn(`[generateVpProfile] displayName sync failed uid=${authUid}:`, e)
+    );
+
+  console.log(`[generateVpProfile] synced name to account affiliateId=${affiliateId} uid=${authUid}`);
+}
 
 // Fires when the root affiliate doc changes (slug claim, admin isHidden update, etc.).
 export const onVpAffiliateWrite = onDocumentWritten(

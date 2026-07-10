@@ -40,7 +40,7 @@ const RANDOM_ID_LENGTH = 10;
 const MAX_TRIES = 5;
 
 // Slugs reserved for named routes in handleDeeplink — cannot be used as short-link IDs.
-const RESERVED_SLUGS = new Set(['auth-redirect', 'device-auth']);
+const RESERVED_SLUGS = new Set(['auth-redirect', 'device-auth', 'confirm-delete']);
 
 const makeDocData = (b: CreateBody) => ({
   linkTitle: b.linkTitle,

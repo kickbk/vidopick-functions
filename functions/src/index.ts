@@ -88,6 +88,8 @@ export { onUserCreated } from './functions/onUserCreated';
 export { saveReferral } from './functions/saveReferral';
 export { claimAffiliatePro } from './functions/claimAffiliatePro';
 export { deleteAffiliate } from './functions/deleteAffiliate';
+export { requestAccountDeletion } from './functions/requestAccountDeletion';
+export { completeAccountDeletion } from './functions/completeAccountDeletion';
 export { approveCommissions } from './functions/approveCommissions';
 export { sendAffiliateInvite } from './functions/sendAffiliateInvite';
 export { sendAffiliateSignInLink } from './functions/sendAffiliateSignInLink';

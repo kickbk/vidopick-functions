@@ -1635,66 +1635,19 @@ export function buildAffiliateInviteEmail(name: string, email: string, magicLink
     <!-- Card -->
     <div style="background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
       <h1 style="font-size:24px;font-weight:700;margin:0 0 8px;color:#0f172a">Hi ${esc(name)}!</h1>
-      <p style="font-size:15px;line-height:1.65;color:#475569;margin:0 0 32px">
+      <p style="font-size:15px;line-height:1.65;color:#475569;margin:0 0 20px">
         You've been invited to join the <strong style="color:#1e293b">Vidopick Affiliate Program</strong>.
-        Here's how to get started. We'll guide you through each step once you're in.
+        Let's get started!
       </p>
 
-      <!-- Step 1 -->
-      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:20px">
-        <div style="background:#dbeafe;color:#1d4ed8;width:28px;height:28px;border-radius:50%;font-weight:700;font-size:13px;flex-shrink:0;line-height:28px;text-align:center">1</div>
-        <div>
-          <p style="font-weight:600;font-size:15px;color:#1e293b;margin:0 0 6px">Download Vidopick</p>
-          <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <a href="https://apps.apple.com/us/app/vidopick/id6749210639" style="display:inline-flex;align-items:center;gap:8px;background:#000;border:1px solid #334155;color:#fff;text-decoration:none;padding:8px 14px;border-radius:10px">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-              <span style="text-align:left;line-height:1.2"><span style="display:block;font-size:10px;color:#94a3b8">Download on the</span><span style="display:block;font-size:13px;font-weight:600">App Store</span></span>
-            </a>
-            <a href="https://play.google.com/store/apps/details?id=com.vidopick.app" style="display:inline-flex;align-items:center;gap:8px;background:#000;border:1px solid #334155;color:#fff;text-decoration:none;padding:8px 14px;border-radius:10px">
-              <svg width="18" height="18" viewBox="0 0 24 24"><path d="M3.18 23.76A2 2 0 0 1 2 22V2a2 2 0 0 1 1.18-1.76l11.31 11.75L3.18 23.76z" fill="#00C6FB"/><path d="M20.09 10.53l-2.5-1.45L14.49 12l3.1 2.92 2.5-1.45a2 2 0 0 0 0-2.94z" fill="#FFD200"/><path d="M3.18 23.76L14.49 12 17.59 14.92 5.5 21.9a2 2 0 0 1-2.32 1.86z" fill="#FF5C78"/><path d="M3.18.24A2 2 0 0 1 5.5 2.1l12.09 6.98L14.49 12 3.18.24z" fill="#00E87C"/></svg>
-              <span style="text-align:left;line-height:1.2"><span style="display:block;font-size:10px;color:#94a3b8">Get it on</span><span style="display:block;font-size:13px;font-weight:600">Google Play</span></span>
-            </a>
-          </div>
-        </div>
-      </div>
+      <a href="${esc(magicLink)}" style="display:inline-block;padding:13px 24px;font-size:15px;font-weight:600;color:#fff;text-decoration:none;background-color:#1d4ed8;border-radius:9px;">
+        Open your Dashboard &rarr;
+      </a>
 
-      <!-- Step 2 -->
-      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:20px">
-        <div style="background:#dbeafe;color:#1d4ed8;width:28px;height:28px;border-radius:50%;font-weight:700;font-size:13px;flex-shrink:0;line-height:28px;text-align:center">2</div>
-        <div style="flex:1">
-          <p style="font-weight:600;font-size:15px;color:#1e293b;margin:0 0 8px">Sign into Vidopick with your email address</p>
-          <div style="background:#eff6ff;border:2px solid #bfdbfe;border-radius:10px;padding:12px 16px;font-family:monospace;font-size:15px;color:#1d4ed8;font-weight:600;text-align:center;letter-spacing:0.02em">
-            ${esc(email)}
-          </div>
-          <p style="font-size:13px;color:#64748b;margin:8px 0 0;line-height:1.5">
-            You'll be approved as <strong>Pro</strong> automatically for free.
-          </p>
-        </div>
-      </div>
-
-      <!-- Step 3 -->
-      <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:32px">
-        <div style="background:#dbeafe;color:#1d4ed8;width:28px;height:28px;border-radius:50%;font-weight:700;font-size:13px;flex-shrink:0;line-height:28px;text-align:center">3</div>
-        <div>
-          <p style="font-weight:600;font-size:15px;color:#1e293b;margin:0 0 10px">Access your Affiliate Dashboard</p>
-          <table cellpadding="0" cellspacing="0" role="presentation">
-            <tr>
-              <td style="background-color:#1d4ed8;border-radius:9px;">
-                <a href="${esc(magicLink)}" style="display:inline-block;padding:13px 24px;font-size:15px;font-weight:600;color:#fff;text-decoration:none;">
-                  Open your Dashboard &rarr;
-                </a>
-              </td>
-            </tr>
-          </table>
-          <p style="font-size:12px;color:#94a3b8;margin:10px 0 0">Link expires in 24 hours.</p>
-        </div>
-      </div>
-
-      <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px;" />
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0 20px;" />
 
       <p style="font-size:12px;color:#94a3b8;margin:0;line-height:1.6">
         The Vidopick Team &middot; If you weren't expecting this email, you can ignore it.<br/>
-        If the button doesn't work: <a href="${esc(magicLink)}" style="color:#3b82f6;word-break:break-all">${esc(magicLink)}</a>
       </p>
     </div>
 
@@ -1863,6 +1816,297 @@ export function buildMemberAppInviteEmail(
       </table>
     </td></tr>
   </table>
+</body>
+</html>`;
+}
+
+/**
+ * Sent to the user when they request account deletion — contains the confirmation link.
+ * confirmUrl is a vpk.to universal link: opens the app if installed, falls back to the web
+ * confirmation page otherwise.
+ */
+export function buildAccountDeletionRequestEmail(name: string, confirmUrl: string): string {
+  const year = new Date().getFullYear();
+  const greeting = name ? esc(name) : 'there';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Confirm your Vidopick account deletion</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+
+        <tr>
+          <td style="padding-bottom:32px;text-align:center;">
+            <span style="${LOGO_STYLE}">Vidopick</span>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
+            <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">Confirm account deletion</h1>
+            <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7;">
+              Hi ${greeting}, you asked to permanently delete your Vidopick account. This removes your
+              account, all your profiles, and all their content, and it cannot be undone.
+              Tap the button below to confirm. Nothing is deleted until you do.
+            </p>
+
+            <table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto 32px;">
+              <tr>
+                <td style="background-color:#dc2626;border-radius:10px;">
+                  <a href="${esc(confirmUrl)}"
+                     style="display:inline-block;padding:15px 36px;font-size:16px;font-weight:600;color:#ffffff;text-decoration:none;letter-spacing:0.01em;white-space:nowrap;">
+                    Delete my account &rarr;
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px;" />
+
+            <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
+              This link expires in 1 hour. If you didn't request this, you can safely ignore this
+              email. Your account will stay exactly as it is.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding-top:24px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              &copy; ${year} Vidopick &middot;
+              <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Sent to the user after their account has been deleted.
+ */
+export function buildAccountDeletedEmail(name: string): string {
+  const year = new Date().getFullYear();
+  const greeting = name ? esc(name) : 'there';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Your Vidopick account has been deleted</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+
+        <tr>
+          <td style="padding-bottom:32px;text-align:center;">
+            <span style="${LOGO_STYLE}">Vidopick</span>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:48px 40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
+            <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#0f172a;line-height:1.3;">Account deleted</h1>
+            <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7;">
+              Hi ${greeting}, your Vidopick account and all its content have been permanently deleted.
+            </p>
+            <p style="margin:0 0 20px;font-size:15px;color:#334155;line-height:1.7;">
+              We're sorry to see you go, and we hope to see you back someday. Whenever you're ready,
+              you can start fresh by opening the app or visiting
+              <a href="https://vidopick.com" style="color:#1d4ed8;text-decoration:underline;">vidopick.com</a>.
+            </p>
+
+            <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px;" />
+
+            <p style="margin:0;font-size:13px;color:#94a3b8;line-height:1.6;">
+              If you didn't expect this, please contact us at
+              <a href="mailto:support@vidopick.com" style="color:#94a3b8;text-decoration:underline;">support@vidopick.com</a>.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding-top:24px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">
+              &copy; ${year} Vidopick &middot;
+              <a href="https://vidopick.com" style="color:#94a3b8;text-decoration:underline;">vidopick.com</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Internal summary sent to notifications@ when a user deletes their account.
+ */
+export function buildOwnerAccountDeletedEmail(summary: {
+  name: string;
+  email: string;
+  uid: string;
+  proType: string;
+  proStatus: string;
+  profileCount: number;
+  isAffiliate: boolean;
+  affiliateEarningsUsd?: string;
+}): string {
+  const year = new Date().getFullYear();
+  const row = (label: string, value: string) =>
+    `<tr>
+       <td style="padding:8px 0;font-size:14px;color:#64748b;width:180px;">${esc(label)}</td>
+       <td style="padding:8px 0;font-size:14px;color:#0f172a;font-weight:600;">${esc(value)}</td>
+     </tr>`;
+  const rows = [
+    row('Name', summary.name || '—'),
+    row('Email', summary.email || '—'),
+    row('UID', summary.uid),
+    row('Account type', `${summary.proType || 'none'} (${summary.proStatus || 'none'})`),
+    row('Profiles', String(summary.profileCount)),
+    row('Affiliate', summary.isAffiliate ? 'Yes (disabled)' : 'No'),
+    ...(summary.isAffiliate
+      ? [row('Affiliate earnings', `$${summary.affiliateEarningsUsd ?? '0.00'}`)]
+      : []),
+  ].join('');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Account deleted</title>
+  <style>${FONT_FACE}</style>
+</head>
+<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f1f5f9;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;width:100%;">
+
+        <tr>
+          <td style="padding-bottom:32px;text-align:center;">
+            <span style="${LOGO_STYLE}">Vidopick</span>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="background:#ffffff;border-radius:16px;padding:40px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.07),0 2px 4px -1px rgba(0,0,0,0.04);">
+            <h1 style="margin:0 0 20px;font-size:22px;font-weight:700;color:#0f172a;line-height:1.3;">Account deleted</h1>
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+              ${rows}
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding-top:24px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#94a3b8;">&copy; ${year} Vidopick</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Branded full-page HTML shown by the completeAccountDeletion HTTP endpoint (styled to
+ * match vidopick.com). `state` selects the message shown.
+ */
+/**
+ * Served immediately on GET /completeAccountDeletion?token=xxx.
+ * Shows a spinner while the embedded JS calls POST to execute the deletion.
+ */
+export function renderAccountDeletionLoadingPage(token: string): string {
+  const safeToken = token.replace(/[^a-f0-9]/gi, '');
+  const year = new Date().getFullYear();
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deleting account · Vidopick</title>
+  <style>
+    ${FONT_FACE}
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 48px; height: 48px; border: 4px solid rgba(3,39,60,0.12);
+      border-top-color: #0069A6; border-radius: 50%;
+      animation: spin 0.9s linear infinite; margin: 0 auto 20px;
+    }
+  </style>
+</head>
+<body style="margin:0;padding:0;background-color:#B7E6FF;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="min-height:100vh;background-color:#B7E6FF;padding:48px 16px;">
+    <tr><td align="center" valign="middle">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:520px;width:100%;">
+        <tr>
+          <td style="padding-bottom:28px;text-align:center;">
+            <span style="${LOGO_STYLE}font-size:44px;">Vidopick</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;border-radius:20px;padding:48px 40px;text-align:center;box-shadow:0 10px 30px rgba(3,39,60,0.12);">
+            <div id="vp-loading">
+              <div class="spinner"></div>
+              <p style="margin:0;font-size:16px;color:#334155;line-height:1.7;">Deleting your account&hellip;</p>
+            </div>
+            <div id="vp-success" style="display:none;">
+              <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#03273c;line-height:1.3;">Your account has been deleted</h1>
+              <p style="margin:0;font-size:16px;color:#334155;line-height:1.7;">We&rsquo;re sorry to see you go. You&rsquo;re welcome back anytime.</p>
+            </div>
+            <div id="vp-expired" style="display:none;">
+              <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#03273c;line-height:1.3;">This link has expired</h1>
+              <p style="margin:0 0 28px;font-size:16px;color:#334155;line-height:1.7;">For your security, account-deletion links are valid for 1&nbsp;hour. Open the Vidopick app and request deletion again to get a fresh link.</p>
+              <a href="https://vidopick.com" style="display:inline-block;padding:14px 32px;font-size:16px;font-weight:600;color:#ffffff;background-color:#0069A6;border-radius:12px;text-decoration:none;">Go to vidopick.com</a>
+            </div>
+            <div id="vp-error" style="display:none;">
+              <h1 style="margin:0 0 16px;font-size:26px;font-weight:700;color:#03273c;line-height:1.3;">We couldn&rsquo;t complete this</h1>
+              <p style="margin:0 0 28px;font-size:16px;color:#334155;line-height:1.7;">Something went wrong deleting your account. Please try again from the app, or contact support@vidopick.com.</p>
+              <a href="https://vidopick.com" style="display:inline-block;padding:14px 32px;font-size:16px;font-weight:600;color:#ffffff;background-color:#0069A6;border-radius:12px;text-decoration:none;">Go to vidopick.com</a>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-top:24px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#03273c;opacity:0.6;">&copy; ${year} Vidopick</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+  <script>
+    function showResult(state) {
+      document.getElementById('vp-loading').style.display = 'none';
+      var allowed = ['success', 'expired', 'error'];
+      var id = allowed.indexOf(state) !== -1 ? state : 'error';
+      document.getElementById('vp-' + id).style.display = '';
+    }
+    fetch(window.location.href, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: '${safeToken}' })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { showResult(d.state); })
+    .catch(function() { showResult('error'); });
+  </script>
 </body>
 </html>`;
 }

@@ -35,7 +35,7 @@ export const activateAffiliateJoin = onRequest(
       }
 
       const snap = await db
-        .collection('outreach_affiliates')
+        .collection('affiliatesOutreach')
         .where('activationToken', '==', token)
         .limit(1)
         .get();
@@ -74,7 +74,7 @@ export const activateAffiliateJoin = onRequest(
       }
 
       const snap = await db
-        .collection('outreach_affiliates')
+        .collection('affiliatesOutreach')
         .where('activationToken', '==', token)
         .limit(1)
         .get();

@@ -509,6 +509,17 @@ async function handleShortlinkById(id: string, req: express.Request, res: expres
   }
 }
 
+// Account deletion confirmation: browser fallback for vpk.to/confirm-delete?token=xxx
+// When the app is installed, iOS/Android intercept this URL before it reaches the browser.
+// When it does reach the browser, redirect to the Cloud Function that shows the spinner page.
+const COMPLETE_DELETION_URL =
+  'https://us-central1-vidopick-c725d.cloudfunctions.net/completeAccountDeletion';
+app.get('/confirm-delete', (req, res) => {
+  const token = String(req.query.token ?? '').replace(/[^a-f0-9]/gi, '');
+  const dest = token ? `${COMPLETE_DELETION_URL}?token=${token}` : 'https://vidopick.com';
+  return res.redirect(302, dest);
+});
+
 // Affiliate profile share links: vpk.to/a/{slug} → shortLinks/a_{slug}
 app.get('/a/:slug', async (req, res) => {
   await handleShortlinkById(`a_${req.params.slug}`, req, res);

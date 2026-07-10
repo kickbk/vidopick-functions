@@ -1,5 +1,5 @@
 /**
- * Import leads.json into Firestore outreach_affiliates collection.
+ * Import leads.json into Firestore affiliatesOutreach collection.
  *
  * Usage:
  *   node firebase/functions/src/scripts/importLeads.mjs [path/to/leads.json]
@@ -18,7 +18,14 @@ import { resolve } from 'path';
 admin.initializeApp({ projectId: 'vidopick-c725d' });
 const db = admin.firestore();
 
-const TERMINAL_STATUSES = new Set(['sent', 'delivered', 'bounced', 'complained', 'booked', 'send_failed']);
+const TERMINAL_STATUSES = new Set([
+  'sent',
+  'delivered',
+  'bounced',
+  'complained',
+  'booked',
+  'send_failed',
+]);
 
 const filePath = process.argv[2] ? resolve(process.argv[2]) : resolve(process.cwd(), 'leads.json');
 console.log(`Reading leads from: ${filePath}`);
@@ -40,7 +47,7 @@ for (const lead of leads) {
     continue;
   }
 
-  const ref = db.collection('outreach_affiliates').doc(lead.id);
+  const ref = db.collection('affiliatesOutreach').doc(lead.id);
   const existing = await ref.get();
 
   if (existing.exists) {
@@ -105,5 +112,7 @@ for (const lead of leads) {
   }
 }
 
-console.log(`\nDone. New: ${newCount}, Updated: ${updatedCount}, Skipped (past approved): ${skippedCount}`);
+console.log(
+  `\nDone. New: ${newCount}, Updated: ${updatedCount}, Skipped (past approved): ${skippedCount}`
+);
 process.exit(0);

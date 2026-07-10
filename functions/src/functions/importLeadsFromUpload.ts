@@ -5,7 +5,12 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 if (!admin.apps.length) admin.initializeApp();
 
 const TERMINAL_STATUSES = new Set([
-  'sent', 'delivered', 'bounced', 'complained', 'booked', 'send_failed',
+  'sent',
+  'delivered',
+  'bounced',
+  'complained',
+  'booked',
+  'send_failed',
 ]);
 
 interface LeadInput {
@@ -52,7 +57,7 @@ export const importLeadsFromUpload = onCall(
     for (const lead of raw as LeadInput[]) {
       if (!lead.id) continue;
 
-      const ref = db.collection('outreach_affiliates').doc(lead.id);
+      const ref = db.collection('affiliatesOutreach').doc(lead.id);
       const existing = await ref.get();
 
       if (existing.exists) {

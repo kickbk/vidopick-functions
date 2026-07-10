@@ -1,3 +1,5 @@
 .env
 .firebase
 functions/integrations/*
+firebase-debug.log
+functions/firebase-debug.log

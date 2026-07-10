@@ -462,11 +462,11 @@ service cloud.firestore {
       }
     }
 
-    // ── outreach_affiliates ───────────────────────────────────────────────────
+    // ── affiliatesOutreach ───────────────────────────────────────────────────
     // Admin-only. Cloud Functions (resendOutreachWebhook, sendAffiliateOutreachEmail)
     // use Admin SDK and bypass these rules.
 
-    match /outreach_affiliates/{leadId} {
+    match /affiliatesOutreach/{leadId} {
       allow read, write: if isAdmin();
     }
 

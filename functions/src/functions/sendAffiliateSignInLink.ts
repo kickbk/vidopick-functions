@@ -41,7 +41,15 @@ export const sendAffiliateSignInLink = onRequest(
         .limit(1)
         .get();
 
-      if (!snap.empty && RESEND_API_KEY) {
+      // Note: the response is always 200 (anti-enumeration). These logs distinguish the
+      // silent no-op cases (not a registered affiliate / no email key) from an actual send.
+      if (snap.empty) {
+        console.log(
+          `[sendAffiliateSignInLink] no influencer affiliate for ${email.toLowerCase()} — nothing sent`
+        );
+      } else if (!RESEND_API_KEY) {
+        console.error('[sendAffiliateSignInLink] RESEND_API_KEY missing — cannot send');
+      } else {
         const affiliateName: string = snap.docs[0].data().name ?? 'there';
         const base = resolveAppUrl(req.headers.origin);
         const continueUrl = `${base}/vp/auth/email-action/?email=${encodeURIComponent(email)}`;

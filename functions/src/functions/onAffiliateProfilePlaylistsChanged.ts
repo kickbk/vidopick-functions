@@ -15,10 +15,12 @@ async function fetchPlaylistThumbnails(
     .filter((t): t is string => !!t);
 }
 
-// When an affiliate updates the playlists in their featured profile, keep the
-// thumbnail snapshot on the publicProfiles entry in sync. Regular users who
-// update non-featured profiles short-circuit on the publicAffiliateId check
-// and incur no additional cost.
+// When an affiliate updates a featured profile, keep the snapshot fields on the
+// publicProfiles entry (thumbnails, name, color) in sync — these are copied at
+// add time (see addPublicProfile) and would otherwise go stale on rename/recolor.
+// The write cascades to onVpPublicProfileWrite, which regenerates the profile HTML.
+// Regular users who update non-featured profiles short-circuit on the
+// publicAffiliateId check and incur no additional cost.
 export const onAffiliateProfilePlaylistsChanged = onDocumentUpdated(
   { document: 'profiles/{profileId}', region: 'us-central1' },
   async (event) => {
@@ -31,25 +33,30 @@ export const onAffiliateProfilePlaylistsChanged = onDocumentUpdated(
 
     const beforeIds: string[] = before.playlistIds ?? [];
     const afterIds: string[] = after.playlistIds ?? [];
+    const playlistsChanged = JSON.stringify(beforeIds) !== JSON.stringify(afterIds);
+    const nameChanged = (before.name ?? '') !== (after.name ?? '');
+    const colorChanged = (before.color ?? '') !== (after.color ?? '');
 
-    if (JSON.stringify(beforeIds) === JSON.stringify(afterIds)) return;
+    if (!playlistsChanged && !nameChanged && !colorChanged) return;
 
     const profileId = event.params.profileId;
     const db = admin.firestore();
 
-    const entrySnap = await db
-      .doc(`affiliates/${affiliateId}/publicProfiles/${profileId}`)
-      .get();
+    const entryRef = db.doc(`affiliates/${affiliateId}/publicProfiles/${profileId}`);
+    const entrySnap = await entryRef.get();
     if (!entrySnap.exists) return;
 
-    const thumbnails = await fetchPlaylistThumbnails(db, afterIds);
+    // Mirror the same fields/defaults addPublicProfile snapshots at add time.
+    const update: Record<string, unknown> = {};
+    if (playlistsChanged) update.thumbnails = await fetchPlaylistThumbnails(db, afterIds);
+    if (nameChanged) update.profileName = after.name ?? 'Profile';
+    if (colorChanged) update.profileColor = after.color ?? '#3b82f6';
 
-    await db
-      .doc(`affiliates/${affiliateId}/publicProfiles/${profileId}`)
-      .update({ thumbnails });
+    await entryRef.update(update);
 
     console.log(
-      `[onAffiliateProfilePlaylistsChanged] profileId=${profileId} affiliateId=${affiliateId} thumbnails=${thumbnails.length}`
+      `[onAffiliateProfilePlaylistsChanged] profileId=${profileId} affiliateId=${affiliateId} ` +
+        `playlists=${playlistsChanged} name=${nameChanged} color=${colorChanged}`
     );
   }
 );

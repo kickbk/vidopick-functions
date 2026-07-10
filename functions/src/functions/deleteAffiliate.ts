@@ -62,10 +62,12 @@ export const deleteAffiliate = onCall(
     }
 
     // Delete Storage HTML files (onVpAffiliateWrite would also do this, but be explicit)
+    // and the entire affiliates/{id}/ folder (photo.jpg, og.jpg, etc.)
     const bucket = admin.storage().bucket();
     await Promise.all([
       bucket.file(`profile-html/${affiliateId}.html`).delete().catch(() => {}),
       ...(slug ? [bucket.file(`profile-html/${slug}.html`).delete().catch(() => {})] : []),
+      bucket.deleteFiles({ prefix: `affiliates/${affiliateId}/` }).catch(() => {}),
     ]);
 
     // Recursively delete the affiliate doc + all subcollections (publicProfiles, dailyStats, etc.)

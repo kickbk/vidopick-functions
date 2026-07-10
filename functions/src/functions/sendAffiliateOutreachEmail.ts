@@ -16,7 +16,7 @@ export const sendAffiliateOutreachEmail = onCall({ region: 'us-central1' }, asyn
   if (!RESEND_API_KEY) throw new HttpsError('internal', 'Email not configured.');
 
   const db = admin.firestore();
-  const ref = db.doc(`outreach_affiliates/${leadId}`);
+  const ref = db.doc(`affiliatesOutreach/${leadId}`);
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError('not-found', 'Lead not found.');
 
@@ -26,8 +26,10 @@ export const sendAffiliateOutreachEmail = onCall({ region: 'us-central1' }, asyn
     'send_failed',
     'sent',
     'delivered',
+    'delayed',
     'bounced',
     'complained',
+    'failed',
     'booked',
   ];
   if (!sendableStatuses.includes(lead.status)) {
@@ -128,22 +130,21 @@ function buildOutreachEmail(
     <li>Pro access the moment you're set up, so you can build the playlist profiles you'll actually share. Your recommendations, your invite.</li>
   </ul>
 
-  <p style="font-size:15px;line-height:1.7;margin:0 0 16px">Have a look at two existing affiliate pages:</p>
+  <p style="font-size:15px;line-height:1.7;margin:0 0 16px">Have a look at some of our affiliate pages:</p>
 
   <p style="font-size:15px;line-height:1.7;margin:0 0 16px">
     <a href="https://vidopick.com/vp/digitalmom" style="color:#2563eb;text-decoration:none">vidopick.com/vp/digitalmom</a><br>
+    <a href="https://vidopick.com/vp/msalice" style="color:#2563eb;text-decoration:none">vidopick.com/vp/msalice</a><br>
     <a href="https://vidopick.com/vp/jodiemyers" style="color:#2563eb;text-decoration:none">vidopick.com/vp/jodiemyers</a>
   </p>
   
   <p style="font-size:15px;line-height:1.7;margin:0 0 16px">The recurring share is well beyond the one-time payouts most parenting brands offer, and the discount means you're handing your people a real deal, not a sales pitch.</p>
 
-  <p style="font-size:15px;line-height:1.7;margin:0 0 8px">Your activation link is personal to you. Use it to set up your affiliate account, then log into Vidopick with the same email and Pro is already on, ready for you to build your first profile:</p>
+  <p style="font-size:15px;line-height:1.7;margin:0 0 16px">I'd love to have you on board!</p>
 
-  <p style="margin:0 0 32px">
-    <a href="${safeLink}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:13px 24px;border-radius:9px;font-size:15px;font-weight:600">Set up your affiliate account →</a>
-  </p>
-
-  <p style="font-size:15px;line-height:1.7;margin:0 0 8px">I'd love to have you on board. The setup's quick, and I'm around if you have questions.</p>
+  <p style="font-size:15px;line-height:1.7;margin:0 0 16px">I'm happy to walk you through setup so your page and first profiles look great. You can <a href="https://calendly.com/vidopick/30min" style="color:#2563eb;text-decoration:none">grab 30 minutes here</a>.</p>
+  
+  <p style="font-size:15px;line-height:1.7;margin:0 0 16px">Or, if you'd rather jump straight in, you can activate your affiliate account here: <a href="${safeLink}" style="color:#2563eb;text-decoration:none">Activate your account</a>.</p>
 
   <p style="font-size:15px;line-height:1.7;margin:0 0 24px">Best,</p>
 
@@ -155,12 +156,9 @@ function buildOutreachEmail(
         </a>
       </td>
       <td style="border-left:2px solid #71b5da;padding-left:16px;vertical-align:middle">
-        <div style="font-size:15px;font-weight:bold;color:#111111;margin-bottom:6px">Ben Kass</div>
-        <div style="font-size:13px;margin-bottom:4px">
+        <div style="font-size:15px;font-weight:bold;color:#111111;margin-bottom:8px">Ben Kass</div>
+        <div style="font-size:13px;">
           <a href="https://vidopick.com/affiliates" style="color:#71b5da;text-decoration:none">Affiliate program details</a>
-        </div>
-        <div style="font-size:13px">
-          <a href="https://calendly.com/vidopick/30min" style="color:#71b5da;text-decoration:none">Quick talk first? Grab 30 min</a>
         </div>
       </td>
     </tr>
